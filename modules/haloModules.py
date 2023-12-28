@@ -96,7 +96,36 @@ def manualTokenUpdate(key,token):
     return attemptUpdate
 
 
+# TODO #1 
+# TODO #2 
+def productUpdate(token,updateField,originalText,replacementText):
+    """ Update a halo product by value."""
+    headers = { # Header with token
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+        }
+    def updateByID(ID,originalStr):
+        payload = json.dumps([{
+        updateField: originalStr.replace(originalText,replacementText),
+        "id": ID # Set your custom integration ID here
+        }])
+        attemptUpdate = requests.post(HALO_API_URL+ '/item', headers = headers, data=payload)
+        return attemptUpdate.status_code
 
-def productUpdate():
-    """ Update a halo product """
-    pass
+    request = requests.get(HALO_API_URL+ '/item', headers = headers)
+    itemsList = json.loads(request.content)['items']
+    for item in itemsList:
+        if item == 'more':
+            item = item['more']
+        if updateField in item:
+            if originalText in item[updateField]:
+                print(f'[{item["id"]}] {item["name"]}\n - {item[updateField]}') # Original string
+                attemptUpdate = updateByID(item["id"],item[updateField])
+                print(attemptUpdate) # Status of attempted assetUpdate
+                
+    
+
+### Testing the above tool
+# originalText = 'for (contract start date) - (contract end date) - billed monthly'
+# newText = 'for contract period $CONTRACTSTARTDATE - $CONTRACTENDDATE (billed monthly)'
+# productUpdate(getHaloToken(),'description',originalText,newText)
