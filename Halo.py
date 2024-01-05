@@ -3,7 +3,7 @@ from datetime import datetime, date
 import json
 
 # Local modules
-from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket
+from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch
 from modules.miscModules import daysSince, valueExtract
 from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
@@ -14,7 +14,7 @@ from modules.databaseModules import queryDB
 
 
 # Toggles #TODO #10 Find a better place for these(webUI?)
-createAlertTickets = False # Enable ticket creation
+createAlertTickets = True # Enable ticket creation
 osChecking = True # Enable checking of OS version
 debugOnly = False # Disable asset updating
 forceUpdate = True #Update assets even if they have already been checked today
@@ -119,6 +119,7 @@ for device in assetList['assets']:
     # OS Type/version 
     if 'macOS' in nAbleDetails["os"]:
         osMain = 'macOS ' # macOS version is added later
+        osMainRaw = osMain.strip() # Clean version of macOS, idk if we need this
     elif 'Microsoft' in nAbleDetails["os"]:
         osMain = 'Windows ' + str(nAbleDetails["os"].split(' ')[2])
     else:
@@ -163,8 +164,6 @@ for device in assetList['assets']:
             "value": dncValue}        """
 
 
-
-
     # Send information to Halo 
     payload = json.dumps([{ # Device update payload
         "_dontaddnewfields": True,
@@ -175,21 +174,38 @@ for device in assetList['assets']:
     # Attempt to update device if debug mode disabled
     if debugOnly == False:
         attemptUpdate = updateHaloAsset(payload,sessionToken)
-        if attemptUpdate.status_code == 201:
-            print(f"{attemptUpdate.status_code} Success: {device['id']}")
-        else:
-            print(f"{attemptUpdate.status_code} Unknown: {device['id']}")
-    else:
-        print('debug mode, moving to next device')
 
     ### THIS SHOULD BE ItS OWN MODULE ###
     # Create ticket for devices that need reboot
-    if lastBootString != 'Not Available' and activeChecks == "1" and 2 == 2 and createAlertTickets == True and createAlertTickets == True: 
-        def createTicketFromPayload(ticketString): # Sends payload to halo and creates ticket
+    if 'id' not in haloDetailExpanded['users']: # Asset does not have user
+        userID = None
+        queries = {
+        'deviceName':nAbleDetails['name'].split(' ')[0],
+        'deviceDescription':nAbleDetails['description'].split(' ')[0],
+        'deviceUser':nAbleDetails['username'],
+        }
+        for term in queries.values():
+            queryLoad = {
+                'pageinate':'false',
+                "client_id": device['client_id'], # Client ID 
+                # "site_id": device['site_id'], # Site ID
+                'count': 3,
+                'search':term
+            }
+            user = userSearch(sessionToken,queryLoad)
+            if user['record_count'] > 0:
+                userID = user['users'][0]['id']
+                break
+            
+                
+    else:
+        userID = haloDetailExpanded['users'][0]['id']
+    
+    # Check that DNC isnt true, the device has active checks, and tickets should be created.
+    if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues['161'] if '161' in haloValues else 2) == 2 and createAlertTickets == True: 
+        def ticketPayloadCreator(ticketString,ticType='alert'): # Sends payload to halo and creates ticket
             payload = json.dumps([{
-                "usertype": 1, # Is this needed
-                "itil_tickettype_id": -1, # Is this needed?
-                "tickettype_id": "21", # Alert ticket type
+                "tickettype_id": "21" if ticType == 'alert' else ticType, # Alert ticket type
                 "client_id": device['client_id'], # Client ID 
                 "site_id": device['site_id'], # Site ID
                 "summary": ticketString, #Ticket Subject
@@ -199,21 +215,32 @@ for device in assetList['assets']:
                         "id": device['id'],  # Asset
                     }
                 ],
-                # "user_id": device['user_id'], TODO #5 Name is not pulled, find another way to get it.
+                "user_id": userID,
                 "donotapplytemplateintheapi": True, # Is this needed
-                # "utcoffset": 0, # Is this needed
                 "form_id": "newticketf3f2abad-8df2-48b4-90ba-39b073c27c84", # Is this needed
                 "dont_do_rules": True, # Is this needed
                 }])
             createHaloTicket(payload,sessionToken)
-        if osChecking == True and 'macOS' in nAbleDetails["os"] and macDetails in [2,3,4]: # Check for out of date Macs
+            
+            
+            
+        genericString = 'Your computer '
+        if osChecking == True and osDetails in [2,3,4]: # Out of date device tickets
+            baseString = f'{device["key_field"]} '
+            
+            osStrings =  {
+                '2':f'is no longer supported and should be replaced',
+                '3': f'is running an unsupported version of {osMainRaw}',
+                '4': f'is running an outdated version of {osMain} and needs to be updated',
+            }
+            
             # Does not alert for possibly unsupported for now.
-            createTicketFromPayload(f"{device['key_field']} is {'running an unsupported version of macOS' if macDetails == 3 else 'running an outdated version of macOS' if macDetails == 4 else 'no longer supported and should be replaced'}")
-        if lastResponse > daysSince(5) and lastBoot < daysSince(19) and False:
+            ticketPayloadCreator(genericString + osStrings[str(osDetails)])
+        if lastResponse > daysSince(5) and lastBoot < daysSince(19):
             print("Restart overdue") # DEBUG
-            createTicketFromPayload(f"{device['key_field']} needs reboot. Last boot {lastBootString}" )
-        elif lastResponse < daysSince(30) and False:
+            ticketPayloadCreator(f"{genericString} requires a restart. Last restarted {lastBootString}" )
+        elif lastResponse < daysSince(30):
             print("Has not responded") # DEBUG
-            createTicketFromPayload(f"{device['key_field']} last responded {lastResponseString}")
+            ticketPayloadCreator(f"{genericString} was last online {lastResponseString} ")
         else: #Skip remaining code 
             continue

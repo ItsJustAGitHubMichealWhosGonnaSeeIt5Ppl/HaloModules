@@ -84,7 +84,7 @@ def winCheck(osVerRaw):
     sqlQuery = "SELECT * FROM win_versions_main WHERE os_build_main=?"
     sqlData = (osVerMajor,)
     sqlResult = queryDB(sqlQuery,sqlData,'default','searchone')
-    if daysSince(13) > date.fromtimestamp(sqlResult[7]):
+    if sqlResult != None and daysSince(13) > date.fromtimestamp(sqlResult[7]):
         msoftVersions()
         sqlResult = queryDB(sqlQuery,sqlData,'default','searchone') # Re-run search with updated information
     sqlFQuery = "SELECT * FROM win_versions_sub WHERE os_build=?"
@@ -92,7 +92,7 @@ def winCheck(osVerRaw):
     sqlFullBuild = queryDB(sqlFQuery,sqlFData,'default','searchone')
 
     # TODO #34 Check minor version list
-    osString = f'{osVerMajor}.{osVerMinor} ({sqlResult[1]})'
+    osString = f'{osVerMajor}.{osVerMinor} ({sqlResult[1] if sqlResult != None else "Unknown"})'
     def osStatusCheck():
         if sqlFullBuild == None:
             return 1 # Full version string not found, report possibly unsupported.

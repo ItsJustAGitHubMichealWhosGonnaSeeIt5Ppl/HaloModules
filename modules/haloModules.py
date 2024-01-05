@@ -59,7 +59,7 @@ def getHaloAssets(token,id=None):
     'Authorization': 'Bearer ' + token
     }   
     if id != None:
-        assetRequest = requests.get(HALO_API_URL + "/asset/" + str(id), headers = headers)
+        assetRequest = requests.get(HALO_API_URL + "/asset/" + str(id) +'?includedetails=True', headers = headers)
     else:
         assetRequest = requests.get(HALO_API_URL + "/asset/", headers = headers)
     if assetRequest.status_code != 200:
@@ -148,3 +148,18 @@ def productDB():
 # originalText = 'for (contract start date) - (contract end date) - billed monthly'
 # newText = 'for contract period $CONTRACTSTARTDATE - $CONTRACTENDDATE (billed monthly)'
 # productUpdate(getHaloToken(),'description',originalText,newText)
+
+
+
+def userSearch(token,query):
+    """ Searches for a user """
+    headers = { # Header with token
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+        }
+    request = requests.get(HALO_API_URL+ '/users?' + urllib.parse.urlencode(query), headers = headers)
+    if request.status_code != 200:
+        return 'Failed to get users'
+    response = json.loads(request.content)
+    return response
+    

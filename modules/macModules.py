@@ -32,7 +32,7 @@ def macCheck(osVerRaw,macModel,osSupported=False):
     - """
     if osVerRaw[:2] == '10': # Check for old versioning format of macOS
         osVerMain = float(osVerRaw[:5])
-        osVerSub = float(osVerRaw[6:])
+        osVerSub = float(osVerRaw[6:] if len(osVerRaw) < 6 else float(0))
         legacyOS = True
     else:
         osVerMain = int(osVerRaw[:2])
