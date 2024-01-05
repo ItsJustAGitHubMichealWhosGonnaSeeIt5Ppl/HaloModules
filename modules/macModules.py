@@ -32,7 +32,7 @@ def macCheck(osVerRaw,macModel,osSupported=False):
     - """
     if osVerRaw[:2] == '10': # Check for old versioning format of macOS
         osVerMain = float(osVerRaw[:5])
-        osVerSub = float(osVerRaw[6:] if len(osVerRaw) < 6 else float(0))
+        osVerSub = float(osVerRaw[6:] if len(osVerRaw) > 6 else float(0))
         legacyOS = True
     else:
         osVerMain = int(osVerRaw[:2])
@@ -40,8 +40,11 @@ def macCheck(osVerRaw,macModel,osSupported=False):
         legacyOS = False
     queryMacVer = 'SELECT os_name FROM osx_versions WHERE os_ver=?'
     queryMacData = (osVerMain,)
-    macQuery = queryDB(queryMacVer,queryMacData,'default','searchone')[0]
-
+    macQuery = queryDB(queryMacVer,queryMacData,'default','searchone')
+    if macQuery == None:
+        return 1, osVerRaw + '?' # This should literally never appear, but somehow one of our computers is running 'macOS 10.16', which does not exist.  To add to the fun, the computer is running Ventura...
+    else:
+        macQuery = macQuery[0]
 
     # Check macOS version status
     def checkMacOS(mode='eol'): 
