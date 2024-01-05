@@ -202,7 +202,7 @@ for device in assetList['assets']:
         userID = haloDetailExpanded['users'][0]['id']
     
     # Check that DNC isnt true, the device has active checks, and tickets should be created.
-    if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues['161'] if '161' in haloValues else 2) == 2 and createAlertTickets == True: 
+    if lastBootString != 'Not Available' and activeChecks == "1" and haloValues[161]  != 1 and createAlertTickets == True: 
         def ticketPayloadCreator(ticketString,ticType='alert'): # Sends payload to halo and creates ticket
             payload = json.dumps([{
                 "tickettype_id": "21" if ticType == 'alert' else ticType, # Alert ticket type
