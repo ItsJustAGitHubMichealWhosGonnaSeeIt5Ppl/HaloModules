@@ -96,7 +96,7 @@ def macCheck(osVerRaw,macModel,osSupported=False):
                 queryDB(sqlQuery,sqlData,dbName,'commit')
             elif sqlResponse[2] < osVerMain: # Current max os data is incorrect
                 sqlQuery = "UPDATE mac_models SET max_supported_os=?, max_os_is_eol=?, last_updated=?, verified='False' WHERE model=?"
-                sqlData = (osVerMain,str(checkMacOS(osVerMain,True)),int(str(datetime.now().timestamp())[:10]),macModel.lower())
+                sqlData = (osVerMain,str(checkMacOS('eol')),int(str(datetime.now().timestamp())[:10]),macModel.lower())
                 queryDB(sqlQuery,sqlData,dbName,'commit')
             elif sqlResponse[3] == 'False' and date.fromtimestamp(sqlResponse[4]) < daysSince(30): #TODO #17 check if it has been over a month since info was updated.
                 if checkMacOS(True) == True: # Check if macOS version is EOL 

@@ -77,7 +77,7 @@ def updateHaloAsset(payload, token):
     attemptUpdate = requests.post(HALO_API_URL+ '/asset/', headers = headers, data=payload)
     if attemptUpdate.status_code in [200,201]:
         return attemptUpdate.content
-    else: # Leaves room for other codes to be indifivually tagged later
+    else: # Leaves room for other codes to be individually checked for later
         return 'Failed to update Asset'
 
 
@@ -108,8 +108,7 @@ def manualTokenUpdate(key,token,id):
     return attemptUpdate
 
 
-# TODO #1 
-# TODO #2 
+
 def productUpdate(token,updateField,originalText,replacementText):
     """ Update a halo product by value. 
     Requires token, field to search on/update, text to search, text to replace with.
@@ -163,3 +162,37 @@ def userSearch(token,query):
     response = json.loads(request.content)
     return response
     
+
+
+
+def invoiceActivator(token,ids=None):
+    """ Activate invoices by ID(s). If no IDs sent, activate all invoices """
+    headers = { # Header with token
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+        }
+    query = {
+        'type': 54,
+    }
+    request = requests.get(HALO_API_URL+ '/Template', headers = headers,params = query)
+    if request.status_code != 200:
+        return 'Failed to get Templates'
+    response = json.loads(request.content)
+    for invoice in response:
+        print(invoice['id'])
+        if invoice == 'more':
+            invoice = invoice['more']
+        if invoice['disabled'] == True:
+            data = json.dumps([{
+                'disabled': False,
+                'end_date': '1901-01-01T00:00:00.000Z',
+                'id':invoice['id']
+                
+            }])
+            updateAttempt = requests.post(HALO_API_URL+ '/Template', headers = headers,data = data)
+            if updateAttempt.status_code !=[200,201]:
+                print('Failed')
+            else:
+                print(f'Updated {invoice["id"]}')
+    return response
+

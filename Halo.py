@@ -14,10 +14,10 @@ from modules.databaseModules import queryDB
 
  #TODO #3 When creating macOS update tickets, note the device type in the ticket body.
 # Toggles #TODO #10 Find a better place for these(webUI?)
-createAlertTickets = True # Enable ticket creation
+createAlertTickets = False # Enable ticket creation
 osChecking = True # Enable checking of OS version
 debugOnly = False # Disable asset updating
-forceUpdate = False #Update assets even if they have already been checked today
+forceUpdate = True #Update assets even if they have already been checked today
 
 
 
@@ -30,7 +30,6 @@ noneDate = date.fromisoformat("1970-01-01")
 # Create token for Halo
 sessionToken = getHaloToken()
 assetList = getHaloAssets(sessionToken)
-
 
 for device in assetList['assets']:
     optionalList = [] # Used for all optional checks 
