@@ -163,19 +163,12 @@ for device in assetList['assets']:
             "value": dncValue}        """
 
 
-    # Send information to Halo 
-    payload = json.dumps([{ # Device update payload
-        "_dontaddnewfields": True,
-        "isassetdetails": True,
-        "fields": baseList + optionalList,
-        "id": f"{device['id']}"}]) # Device ID
     
-    # Attempt to update device if debug mode disabled
-    if debugOnly == False:
-        attemptUpdate = updateHaloAsset(payload,sessionToken)
+    
 
     ### THIS SHOULD BE ItS OWN MODULE ###
     # Create ticket for devices that need reboot
+    userItem = None
     if 'id' not in haloDetailExpanded['users']: # Asset does not have user
         userID = None
         queries = {
@@ -194,12 +187,27 @@ for device in assetList['assets']:
             user = userSearch(sessionToken,queryLoad)
             if user['record_count'] > 0:
                 userID = user['users'][0]['id']
+                userItem = [{'id':userID}]
                 break
-            
-                
     else:
         userID = haloDetailExpanded['users'][0]['id']
+        
     
+    
+    # Send information to Halo 
+    payload = json.dumps([{ # Device update payload
+        "_dontaddnewfields": True,
+        "isassetdetails": True,
+        "fields": baseList + optionalList,
+        "id": f"{device['id']}", # Device ID
+        "users": userItem if userItem != None else ''}])
+        # Attempt to update device if debug mode disabled
+    if debugOnly == False:
+        attemptUpdate = updateHaloAsset(payload,sessionToken)
+    
+
+
+
     # Check that DNC isnt true, the device has active checks, and tickets should be created.
     if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues[161] if 161 in haloValues else 2)   != 1 and createAlertTickets == True: 
         def ticketPayloadCreator(ticketString,ticType='alert'): # Sends payload to halo and creates ticket
