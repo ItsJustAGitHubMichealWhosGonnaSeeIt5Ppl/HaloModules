@@ -3,7 +3,7 @@ from datetime import datetime, date
 import json
 
 # Local modules
-from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch
+from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch, searchHaloTicket
 from modules.miscModules import daysSince, valueExtract
 from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
@@ -32,13 +32,17 @@ sessionToken = getHaloToken()
 assetList = getHaloAssets(sessionToken)
 
 for device in assetList['assets']:
+    print(f'{datetime.now()}: Starting next device')
     optionalList = [] # Used for all optional checks 
     if device['third_party_id'] == 0 or device['assettype_name'] == 'Server': # Skip invalid devices (servers)
+        print(f'{datetime.now()}: Skipping device')
         continue
 
     # Get additional asset information from Halo
+    print(f'{datetime.now()}: Attempting to get more details about device from Halo')
     haloDetailExpanded = getHaloAssets(sessionToken,device['id'])
     haloFieldNames = ['id','value']
+    print(f'{datetime.now()}: Got details from Halo')
 
     
     try: # Skips recently checked dvices. Reduces API requests to NAble, which can be quite slow.
@@ -47,11 +51,12 @@ for device in assetList['assets']:
             continue
     except: # Try except used in case field does not have any data
         pass
-
+    print(f'{datetime.now()}: Attempting to get n-Able asset details...')
     nAbleDetails = getN_AbleInfo(device['third_party_id'])
     if  nAbleDetails == False: # Skip device if N-Able returns an error
         continue
-    
+    print(f'{datetime.now()}: Got details from N-Able')
+
 
 
 
@@ -61,6 +66,7 @@ for device in assetList['assets']:
     160 = hasChecks - 1/Yes, 2/No
     """
 
+    print(f'{datetime.now()}: Re-formatting data')
     # Format output from workstations for Halo
     avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 else '2' # Check for bitdefender #TODO #32 add detection for other AVs
     activeChecks = '1' if int(nAbleDetails['checks']['@count']) > 0 else '2' # Active checks on device (1 = yes)
@@ -91,7 +97,7 @@ for device in assetList['assets']:
             "value": nAbleDetails['lastresponse'],},
         {"id": "157", # Last Boot Date TODO # Make this modular
             "value": nAbleDetails['lastboot'] if lastBootString != "Not Available" else None}]
-
+    print(f'{datetime.now()}: Finished initial data reformat')
     
 
     # Halo asset fields to check
@@ -110,10 +116,12 @@ for device in assetList['assets']:
     ?-STR = Windows full version (if windows device)
     """
 
+    
+    print(f'{datetime.now()}: Getting relevant information from asset')
     # Run value extract on devices (Halo, then nAble)
     haloValues = valueExtract(haloDetailExpanded['fields'],haloCustomFIDs,haloFieldNames)
     nAbleValues = valueExtract(nAbleDetails['checks']['check'],nAbleCheckIDs,nAbleFieldNames) if int(nAbleDetails['checks']['@count']) > 0 else 'No checks'
- 
+    print(f'{datetime.now()}: Got information, checking OS')
 
     # OS Type/version 
     if 'macOS' in nAbleDetails["os"]:
@@ -127,18 +135,22 @@ for device in assetList['assets']:
     # Windows and macOS checks
     if osChecking == True: # Confirm OS checking is enabled, check if current device is a mac
         if nAbleValues != 'No checks' and 'Windows' in osMain and nAbleCheckIDs[0] in nAbleValues.keys() and nAbleValues[nAbleCheckIDs[0]] not in [None,'Script awaiting download','Script timed out']:
+            print(f'{datetime.now()}: Checking Windows versions')
             winDetails = winCheck(nAbleValues[nAbleCheckIDs[0]])
             osVersion = winDetails[1]
             osDetails = winDetails[0]
         elif 'macOS' in osMain:
+            print(f'{datetime.now()}: Checking MacOS versions')
             macDetails = macCheck(nAbleDetails["os"].split(" ")[1],haloValues[51] if 51 in haloValues else 'Unknown',haloValues[162] if 162 in haloValues else 'Unknown')
             osVersion = nAbleDetails["os"].split(" ")[1]
             osDetails = macDetails[0]
             osMain += macDetails[1] # Not inline to allow this to be used in later alert
         else:
+            print(f'{datetime.now()}: Unknown OS, skipping')
             osVersion = 'Unknown'
             osDetails = 'Unknown'
         # TODO #33 Only append this field if data exists, do not overwrite existing information. 
+        print(f'{datetime.now()}: OS checking comepleted')
         optionalList += [
             {"id": "162", #OS Status
                 "value": osDetails},
@@ -165,11 +177,12 @@ for device in assetList['assets']:
 
     
     
-
+    print(f'{datetime.now()}: Checking if asset already has a user')
     ### THIS SHOULD BE ItS OWN MODULE ###
     # Create ticket for devices that need reboot
     userItem = None
     if 'id' not in haloDetailExpanded['users']: # Asset does not have user
+        print(f'{datetime.now()}: Device does not have a user, trying to match')
         userID = None
         queries = {
         'deviceName':nAbleDetails['name'].split(' ')[0],
@@ -191,9 +204,10 @@ for device in assetList['assets']:
                 break
     else:
         userID = haloDetailExpanded['users'][0]['id']
-        
-    
-    
+        print(f'{datetime.now()}: Device already has a user')
+    print(f'{datetime.now()}: User check complete')
+
+    print(f'{datetime.now()}: Updating asset...')
     # Send information to Halo 
     payload = json.dumps([{ # Device update payload
         "_dontaddnewfields": True,
@@ -204,19 +218,29 @@ for device in assetList['assets']:
         # Attempt to update device if debug mode disabled
     if debugOnly == False:
         attemptUpdate = updateHaloAsset(payload,sessionToken)
+        print(f'{datetime.now()}: Asset updated')
     
-
-
-
-    # Check that DNC isnt true, the device has active checks, and tickets should be created.
-    if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues[161] if 161 in haloValues else 2)   != 1 and createAlertTickets == True: 
-        def ticketPayloadCreator(ticketString,ticType='alert'): # Sends payload to halo and creates ticket
+    def ticketPayloadCreator(ticketString,existingTicketID=False,ticType='alert'): # Sends payload to halo and creates ticket
+        if ticType == 'Complete':
+            payload = json.dumps([{
+            'id': existingTicketID,
+            'status_id': '20' # Mark ticket as completed.
+            }])
+        elif existingTicketID != False:
+            payload = json.dumps([{
+            'id': existingTicketID[0],
+            "summary": ticketString,
+            'apply_rules': 'true',
+            "details": f"Previous Summary {existingTicketID[1]}", # HTML formatted info
+            'status_id':'23', # Needs update
+            }])
+        else:
             payload = json.dumps([{
                 "tickettype_id": "21" if ticType == 'alert' else ticType, # Alert ticket type
                 "client_id": device['client_id'], # Client ID 
                 "site_id": device['site_id'], # Site ID
                 "summary": ticketString, #Ticket Subject
-                "details_html": "<p> </p>", # HTML formatted device
+                "details_html": f"<p> </p>", # HTML formatted info
                 "assets": [
                     {
                         "id": device['id'],  # Asset
@@ -227,11 +251,52 @@ for device in assetList['assets']:
                 "form_id": "newticketf3f2abad-8df2-48b4-90ba-39b073c27c84", # Is this needed
                 "dont_do_rules": True, # Is this needed
                 }])
-            createHaloTicket(payload,sessionToken)
-            
-            
-            
-        genericString = 'Your computer '
+        aUpdate = createHaloTicket(payload,sessionToken)
+        print(existingTicketID)
+
+
+    def openTicketMatch():
+        """ Find existing open tickets related to an asset """
+        assetQuery = {
+                'pageinate':'false',
+                'open_only': 'true',
+                "asset_id": device['id'], # Client ID 
+            }
+        openTickets = searchHaloTicket(assetQuery, sessionToken)
+        restart = []
+        offline = []
+        update = []
+        if openTickets['record_count'] > 0: 
+            for ticket in openTickets['tickets']:
+                if 'restart' in ticket['summary']:
+                    if lastResponse > daysSince(5) and lastBoot > daysSince(19):
+                        ticketPayloadCreator('close me', ticket['id'], 'Complete') # Close ticket if issue no longer present
+                    restart = [
+                    {'rID': ticket['id'], 
+                    'rSMRY': ticket['summary']}]
+                elif 'online' in ticket['summary']:
+                    if lastResponse > daysSince(30):
+                         ticketPayloadCreator('close me', ticket['id'], 'Complete')
+                        
+                    offline = [
+                    {'oID': ticket['id'], 
+                    'oSMRY': ticket['summary']}]
+                elif 'computer is' in ticket['summary']:
+                    if osChecking == True and osDetails not in [2,3,4]:
+                         ticketPayloadCreator('close me', ticket['id'], 'Complete')
+                    update = [
+                    {'uID': ticket['id'], 
+                    'uSMRY': ticket['summary']}]
+        return restart if restart != [] else False, offline if offline != [] else False, update if update != [] else False
+    
+    # Terrible awful please fix
+    print(f'{datetime.now()}: Checking open tickets for asset')
+    deviceTickets = openTicketMatch()
+
+    # Check that DNC isnt true, the device has active checks, and tickets should be created.
+    if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues[161] if 161 in haloValues else 2)   != 1 and createAlertTickets == True: 
+
+        genericString = 'Your computer'
         if osChecking == True and osDetails in [2,3,4]: # Out of date device tickets
             baseString = f'{device["key_field"]} '
             
@@ -242,12 +307,13 @@ for device in assetList['assets']:
             }
             
             # Does not alert for possibly unsupported for now.
-            ticketPayloadCreator(genericString + osStrings[str(osDetails)])
+            ticketPayloadCreator(genericString + osStrings[str(osDetails)], openTicketMatch('computer is'))
         if lastResponse > daysSince(5) and lastBoot < daysSince(19):
             print("Restart overdue") # DEBUG
-            ticketPayloadCreator(f"{genericString} requires a restart. Last restarted {lastBootString}" )
+            ticketPayloadCreator(f"{genericString} requires a restart. Last restarted {lastBootString}", openTicketMatch('restart') )
         elif lastResponse < daysSince(30):
             print("Has not responded") # DEBUG
-            ticketPayloadCreator(f"{genericString} was last online {lastResponseString} ")
+            ticketPayloadCreator(f"{genericString} was last online {lastResponseString} ", openTicketMatch('online'))
         else: #Skip remaining code 
             continue
+    print(f'{datetime.now()}: Device complete')

@@ -91,6 +91,17 @@ def createHaloTicket(payload, token):
     return attemptUpdate
 
 
+def searchHaloTicket(query, token):
+    """ Searches for a ticket """
+    headers = { # Header with token
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+        }
+    request = requests.get(HALO_API_URL+ '/tickets?' + urllib.parse.urlencode(query), headers = headers)
+    if request.status_code != 200:
+        return 'Failed to get tickets'
+    response = json.loads(request.content)
+    return response
 
 def manualTokenUpdate(key,token,id):
     """ Manually update tokens for halo integrations.
