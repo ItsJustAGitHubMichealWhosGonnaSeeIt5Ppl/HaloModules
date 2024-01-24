@@ -18,7 +18,7 @@ createAlertTickets = False # Enable ticket creation
 osChecking = True # Enable checking of OS version
 debugOnly = False # Disable asset updating
 forceUpdate = True #Update assets even if they have already been checked today
-
+existingOnly = True # Only update existing asset tickets, do not scan an asset if there is no currently active ticket.
 
 
 # // Code
@@ -43,7 +43,9 @@ for device in assetList['assets']:
     haloDetailExpanded = getHaloAssets(sessionToken,device['id'])
     haloFieldNames = ['id','value']
     print(f'{datetime.now()}: Got details from Halo')
-
+    if existingOnly == True and haloDetailExpanded['open_ticket_count'] == 0:
+        print(f'{datetime.now()}: existingOnly is enabled and this asset has no tickets, skipping')
+        continue
     
     try: # Skips recently checked dvices. Reduces API requests to NAble, which can be quite slow.
         if forceUpdate == False and  datetime.fromisoformat(valueExtract(haloDetailExpanded['fields'],[159],haloFieldNames)[159]) > daysSince(1,'time'):
@@ -220,8 +222,13 @@ for device in assetList['assets']:
         attemptUpdate = updateHaloAsset(payload,sessionToken)
         print(f'{datetime.now()}: Asset updated')
     
-    def ticketPayloadCreator(ticketString,existingTicketID=False,ticType='alert'): # Sends payload to halo and creates ticket
-        if ticType == 'Complete':
+    def ticketPayloadCreator(ticketString,existingTicketID=False,action='alert',**extras): # Sends payload to halo and creates ticket
+        if action.lower() == 'merge':
+            payload = json.dumps([{
+            'id': existingTicketID,
+            'merged_into_id': extras['newID'] # Mark ticket as completed.
+            }])
+        elif action == 'Complete':
             payload = json.dumps([{
             'id': existingTicketID,
             'status_id': '20' # Mark ticket as completed.
@@ -236,7 +243,7 @@ for device in assetList['assets']:
             }])
         else:
             payload = json.dumps([{
-                "tickettype_id": "21" if ticType == 'alert' else ticType, # Alert ticket type
+                "tickettype_id": "21" if action == 'alert' else action, # Alert ticket type
                 "client_id": device['client_id'], # Client ID 
                 "site_id": device['site_id'], # Site ID
                 "summary": ticketString, #Ticket Subject
@@ -260,6 +267,7 @@ for device in assetList['assets']:
         assetQuery = {
                 'pageinate':'false',
                 'open_only': 'true',
+                ''
                 "asset_id": device['id'], # Client ID 
             }
         openTickets = searchHaloTicket(assetQuery, sessionToken)
@@ -268,25 +276,58 @@ for device in assetList['assets']:
         update = []
         if openTickets['record_count'] > 0: 
             for ticket in openTickets['tickets']:
+                if ticket['status_id'] == 20: # Previously completed tickets
+                    print(f'{datetime.now()}: All tickets are completed')
+                    continue # Skip
                 if 'restart' in ticket['summary']:
                     if lastResponse > daysSince(5) and lastBoot > daysSince(19):
                         ticketPayloadCreator('close me', ticket['id'], 'Complete') # Close ticket if issue no longer present
-                    restart = [
-                    {'rID': ticket['id'], 
-                    'rSMRY': ticket['summary']}]
+                    if restart == []:
+                        restart = [
+                        {'rID': ticket['id'], 
+                        'rSMRY': ticket['summary']}]
+                    else:
+                        if int(restart[0]['rID']) > int(ticket['id']):
+                            newID = restart[0]['rID']
+                            oldID = ticket['id']
+                        else:
+                            oldID = restart[0]['rID']
+                            newID = ticket['id']
+                        ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
                 elif 'online' in ticket['summary']:
                     if lastResponse > daysSince(30):
                          ticketPayloadCreator('close me', ticket['id'], 'Complete')
-                        
-                    offline = [
-                    {'oID': ticket['id'], 
-                    'oSMRY': ticket['summary']}]
+                    if offline == []:
+                        offline = [
+                        {'oID': ticket['id'], 
+                        'oSMRY': ticket['summary']}]
+                    else:
+                        if int(offline[0]['oID']) > int(ticket['id']):
+                            newID = offline[0]['oID']
+                            oldID = ticket['id']
+                        else:
+                            oldID = offline[0]['oID']
+                            newID = ticket['id']
+                            offline = [
+                            {'oID': ticket['id'], 
+                            'oSMRY': ticket['summary']}]
+                        ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
                 elif 'computer is' in ticket['summary']:
                     if osChecking == True and osDetails not in [2,3,4]:
-                         ticketPayloadCreator('close me', ticket['id'], 'Complete')
-                    update = [
-                    {'uID': ticket['id'], 
-                    'uSMRY': ticket['summary']}]
+                        ticketPayloadCreator('close me', ticket['id'], 'Complete')
+                    if update == []:
+                        update = [
+                        {'uID': ticket['id'], 
+                        'uSMRY': ticket['summary']}]
+                    else:
+                        if int(update[0]['uID']) > int(ticket['id']):
+                            newID = update[0]['uID']
+                            oldID = ticket['id']
+                        else:
+                            oldID = update[0]['uID']
+                            newID = ticket['id']
+                        ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
+                    
         return restart if restart != [] else False, offline if offline != [] else False, update if update != [] else False
     
     # Terrible awful please fix
