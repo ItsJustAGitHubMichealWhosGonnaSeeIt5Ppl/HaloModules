@@ -183,7 +183,7 @@ for device in assetList['assets']:
     ### THIS SHOULD BE ItS OWN MODULE ###
     # Create ticket for devices that need reboot
     userItem = None
-    if 'id' not in haloDetailExpanded['users'][0]: # Asset does not have user
+    if  len(haloDetailExpanded['users']) == 0: # Asset does not have user
         print(f'{datetime.now()}: Device does not have a user, trying to match')
         userID = None
         queries = {

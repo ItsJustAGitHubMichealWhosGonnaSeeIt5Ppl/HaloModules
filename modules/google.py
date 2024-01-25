@@ -58,12 +58,12 @@ def DriveDataFilter(data,**extra):
             'download': False
         }})
     for event in data.values():
+        count = 0
         for item in event['items']:
-            if item == 'more': # Shows only 100 by default, this allows it to cycle through the remaining ones 
-                event = item['more']
-                continue
+            count +=1
             if item['actor']['email'] in dictIDs.keys():
                 dictIDs[item['actor']['email']].update({item['events'][0]['name']: True})
+        print(count)
     return dictIDs
 
 
