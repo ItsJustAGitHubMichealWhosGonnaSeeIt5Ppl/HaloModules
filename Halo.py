@@ -348,13 +348,13 @@ for device in assetList['assets']:
             }
             
             # Does not alert for possibly unsupported for now.
-            ticketPayloadCreator(genericString + osStrings[str(osDetails)], openTicketMatch('computer is'))
+            ticketPayloadCreator(genericString + osStrings[str(osDetails)], existingTicketID=False)
         if lastResponse > daysSince(5) and lastBoot < daysSince(19):
             print("Restart overdue") # DEBUG
-            ticketPayloadCreator(f"{genericString} requires a restart. Last restarted {lastBootString}", openTicketMatch('restart') )
+            ticketPayloadCreator(f"{genericString} requires a restart. Last restarted {lastBootString}", existingTicketID=False)
         elif lastResponse < daysSince(30):
             print("Has not responded") # DEBUG
-            ticketPayloadCreator(f"{genericString} was last online {lastResponseString} ", openTicketMatch('online'))
+            ticketPayloadCreator(f"{genericString} was last online {lastResponseString} ", existingTicketID=False)
         else: #Skip remaining code 
             continue
     print(f'{datetime.now()}: Device complete')
