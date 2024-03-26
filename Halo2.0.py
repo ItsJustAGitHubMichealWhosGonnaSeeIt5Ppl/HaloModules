@@ -5,14 +5,14 @@ import json
 # Local modules
 import modules.HaloPSA.HaloV2 as Halo
 from modules.miscModules import daysSince, valueExtract
-from modules.msoftModules import winCheck
+from modules.msoftModules import winCheck,customFieldCheck
 from modules.nAbleModules import getN_AbleInfo
 from modules.macModules import macCheck
 
 # TODO #11 Only scan devices in "hiatus" or with "no checks" on occasion 
 #TODO Before making public, status IDs must be switched
 
- #TODO #3 When creating macOS update tickets, note the device type in the ticket body.
+#TODO #3 When creating macOS update tickets, note the device type in the ticket body.
 # Toggles #TODO #10 Find a better place for these(webUI?)
 
 createAlertTickets = False # Enable ticket creation
@@ -35,8 +35,11 @@ assetList = hAssets.getAll()
 
 
 for device in assetList['assets']:
+
     print(f'{datetime.now()}: Starting next device')
+    
     optionalList = [] # Used for all optional checks 
+    
     if device['third_party_id'] == 0 or device['assettype_name'] == 'Server': # Skip invalid devices (servers)
         print(f'{datetime.now()}: Skipping device')
         continue
@@ -78,20 +81,21 @@ for device in assetList['assets']:
     activeChecks = '1' if int(nAbleDetails['checks']['@count']) > 0 else '2' # Active checks on device (1 = yes)
 
     # AV Checks (1 = yes)
-    optionalList += [{"id": "156", 
-                    "value": '1' if int(nAbleDetails['mavbreck']) == 1 else '2'}]
-    # Active Checks (1 = yes)
-    optionalList += [{"id": "160", 
-                    "value": '1' if int(nAbleDetails['checks']['@count']) > 0 else '2'}]
+    optionalList += customFieldCheck(156,'1' if int(nAbleDetails['mavbreck']) == 1 else '2')
     
+    # Active Checks (1 = yes)
+    optionalList += customFieldCheck(160,'1' if int(nAbleDetails['checks']['@count']) > 0 else '2')
 
     # Date checks, commenting these out will likely cause chaos
     lastResponse = date.fromisoformat(nAbleDetails['lastresponse'][:10]) if nAbleDetails['lastresponse'] != '0000-00-00 00:00:00' else "Not Available"
     lastBoot =  date.fromisoformat(nAbleDetails['lastboot'][:10])
-    if lastBoot == noneDate: lastBootString = 'Not Available'
-    else: lastBootString = 'Today' if lastBoot == today else str(today - lastBoot).replace('0:00:00', '').replace(', ', '') + " ago"
+    if lastBoot == noneDate:
+        lastBootString = 'Not Available'
+    else: 
+        lastBootString = 'Today' if lastBoot == today else str(today - lastBoot).replace('0:00:00', '').replace(', ', '') + " ago"
     lastResponseString = 'Today' if lastResponse == today else str(today - lastResponse).replace('0:00:00', '').replace(', ', '') + " ago"  if lastResponse != "Not Available" else "Not Available"    
 
+    # Base list of asset values
     baseList = [ 
         {"id": "155", # Last Boot
             "value": lastBootString},
@@ -128,6 +132,7 @@ for device in assetList['assets']:
     haloValues = valueExtract(haloDetailExpanded['fields'],haloCustomFIDs,haloFieldNames)
     nAbleValues = valueExtract(nAbleDetails['checks']['check'],nAbleCheckIDs,nAbleFieldNames) if int(nAbleDetails['checks']['@count']) > 0 else 'No checks'
     print(f'{datetime.now()}: Got information, checking OS')
+
 
     # OS Type/version 
     if 'macOS' in nAbleDetails["os"]:
@@ -181,13 +186,14 @@ for device in assetList['assets']:
             "value": dncValue}        """
 
 
-    
-    
     print(f'{datetime.now()}: Checking if asset already has a user')
     ### THIS SHOULD BE ItS OWN MODULE ###
     # Create ticket for devices that need reboot
     userItem = None
-    if  len(haloDetailExpanded['users']) == 0: # Asset does not have user
+    if  len(haloDetailExpanded['users']) != 0: # Asset already has a user
+        userID = haloDetailExpanded['users'][0]['id']
+        print(f'{datetime.now()}: Device already has a user')
+    else: # Asset does not have a user
         print(f'{datetime.now()}: Device does not have a user, trying to match')
         userID = None
         queries = {
@@ -207,13 +213,10 @@ for device in assetList['assets']:
             if user['record_count'] > 0:
                 userID = user['users'][0]['id']
                 userItem = [{'id':userID}]
-                break
-    else:
-        userID = haloDetailExpanded['users'][0]['id']
-        print(f'{datetime.now()}: Device already has a user')
+                break 
     print(f'{datetime.now()}: User check complete')
 
-    print(f'{datetime.now()}: Updating asset...')
+    print(f'{datetime.now()}: Attempting to update asset...')
     # Send information to Halo 
     payload = json.dumps([{ # Device update payload
         "_dontaddnewfields": True,
@@ -262,7 +265,8 @@ for device in assetList['assets']:
                 "form_id": "newticketf3f2abad-8df2-48b4-90ba-39b073c27c84", # Is this needed
                 "dont_do_rules": True, # Is this needed
                 }])
-        aUpdate = hTickets.create(payload)
+        hTickets.create(payload)
+        
         print(existingTicketID)
 
 

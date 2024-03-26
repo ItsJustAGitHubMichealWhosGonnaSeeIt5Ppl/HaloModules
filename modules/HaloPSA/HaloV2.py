@@ -92,11 +92,6 @@ class asset():
     def update(self,payload):
         """ Update asset.  ID provided in Payload (for now.) 
         Payload should be formatted with json.dumps, will move that bit in here eventually."""
-        try:
-            payload = json.dumps(payload)
-        except:
-            # TODO Confirm it failed because its already JSON
-            pass
         request = requests.post(assetURL, headers = self.headerJSON, data=payload)
         return responseChecker(request)
 
@@ -115,12 +110,6 @@ class ticket():
     def create(self, payload):
         """ Create a ticket 
         Payload must be formatted for now, will create a formatting tool later"""
-        try:
-            payload = json.dumps(payload)
-        except:
-            # TODO Confirm it failed because its already JSON
-            pass
-       
         request = requests.post(HALO_API_URL+ '/tickets/', headers = self.headerJSON, data=payload)
         return responseChecker(request)
 

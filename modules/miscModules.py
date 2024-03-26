@@ -32,3 +32,16 @@ def valueExtract(customFields,IDs,fieldName):
         if field[fieldName[0]] in IDs and fieldName[1] in field:
             fieldsDict[field[fieldName[0]]] = field[fieldName[1]]
     return fieldsDict
+
+def customFieldCheck(id,value):
+    """ 
+    Adds custom field to be used when updating asset ticket, etc
+    
+    :param id: Custom field ID
+    :param value: Custom field value
+    :return: Returns a list item to be added to your main list of fields
+    """
+    listItem = [
+        {"id": id, 
+        "value": value}]
+    return listItem
