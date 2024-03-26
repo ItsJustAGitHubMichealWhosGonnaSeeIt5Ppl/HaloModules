@@ -28,9 +28,9 @@ def responseChecker(request,returnErrors=False):
     # Success
     if code in [200,201]:
         if returnErrors==True:
-            return 'Success', request.content 
+            return 'Success', json.loads(request.content)
         else:
-            return request.content 
+            return json.loads(request.content)
     # Add unique failures as found
     else:
         if returnErrors==True:
@@ -58,13 +58,14 @@ def createToken():
     else:
         return response
 
+mainToken = createToken()
 
 
 class asset():
     """ Asset actions 
     Initialize by running this once on its own, then run actions"""
     def __init__(self):
-        token = createToken()
+        token = createToken() # Maybe this can be moved out?
         self.token = token
         self.headerJSON = { # Header with token
             'Content-Type': 'application/json',
@@ -96,7 +97,7 @@ class asset():
         except:
             # TODO Confirm it failed because its already JSON
             pass
-        request = requests.post(self.asset, headers = self.header, data=payload)
+        request = requests.post(assetURL, headers = self.headerJSON, data=payload)
         return responseChecker(request)
 
     
@@ -110,6 +111,7 @@ class ticket():
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' +  token
             }
+    
     def create(self, payload):
         """ Create a ticket 
         Payload must be formatted for now, will create a formatting tool later"""
@@ -119,10 +121,10 @@ class ticket():
             # TODO Confirm it failed because its already JSON
             pass
        
-        request = requests.post(HALO_API_URL+ '/tickets/', headers = self.header, data=payload)
+        request = requests.post(HALO_API_URL+ '/tickets/', headers = self.headerJSON, data=payload)
         return responseChecker(request)
 
-    def search(self,query, token):
+    def search(self,query):
         """ Search ticket using Query (Later query will be its own thing so its easier to use) """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/tickets?' + query, headers = self.headerJSON)
@@ -132,13 +134,13 @@ class ticket():
 
 
 
-def productUpdate(token,updateField,originalText,replacementText):
+def productUpdate(updateField,originalText,replacementText):
     """ Update a halo product by value. 
     Requires token, field to search on/update, text to search, text to replace with.
     """
     headers = { # Header with token
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        'Authorization': 'Bearer ' + mainToken
         }
     def updateItemByID(ID,originalStr):
         payload = json.dumps([{
@@ -173,11 +175,11 @@ def productDB():
 
 
 
-def userSearch(token,query):
+def userSearch(query):
     """ Searches for a user """
     headers = { # Header with token
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        'Authorization': 'Bearer ' + mainToken
         }
     request = requests.get(HALO_API_URL+ '/users?' + urllib.parse.urlencode(query), headers = headers)
     if request.status_code != 200:
@@ -188,12 +190,12 @@ def userSearch(token,query):
 
 
 
-def invoiceActivator(token,ids=None):
+def invoiceActivator(ids=None):
     """ Set invoices to Active
     If no IDs sent, all invoices will be set to Active """
     headers = { # Header with token
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        'Authorization': 'Bearer ' + mainToken
         }
     query = {
         'type': 54,
@@ -221,13 +223,13 @@ def invoiceActivator(token,ids=None):
     return response
 
 
-def manualTokenUpdate(key,token,id):
+def manualTokenUpdate(key,id):
     """ Manually update tokens for halo integrations.
 
     Make sure you have the integration type set to bearer token :)"""
     headers = { # Header with token
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        'Authorization': 'Bearer ' + mainToken
         }
     payload = json.dumps([{
         "new_client_secret": str(key),

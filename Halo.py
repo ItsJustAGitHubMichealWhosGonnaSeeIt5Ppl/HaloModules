@@ -3,7 +3,7 @@ from datetime import datetime, date
 import json
 
 # Local modules
-from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch, searchHaloTicket
+from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch, searchHaloTicket, invoiceActivator
 from modules.miscModules import daysSince, valueExtract
 from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
@@ -14,7 +14,8 @@ from modules.databaseModules import queryDB
 
  #TODO #3 When creating macOS update tickets, note the device type in the ticket body.
 # Toggles #TODO #10 Find a better place for these(webUI?)
-createAlertTickets = False # Enable ticket creation
+
+createAlertTickets = True # Enable ticket creation
 osChecking = True # Enable checking of OS version
 debugOnly = False # Disable asset updating
 forceUpdate = True #Update assets even if they have already been checked today
@@ -30,6 +31,7 @@ noneDate = date.fromisoformat("1970-01-01")
 # Create token for Halo
 sessionToken = getHaloToken()
 assetList = getHaloAssets(sessionToken)
+
 
 for device in assetList['assets']:
     print(f'{datetime.now()}: Starting next device')
@@ -277,7 +279,7 @@ for device in assetList['assets']:
         if openTickets['record_count'] > 0: 
             for ticket in openTickets['tickets']:
                 if ticket['status_id'] == 20: # Previously completed tickets
-                    print(f'{datetime.now()}: All tickets are completed')
+                    print(f'{datetime.now()}: Ticket is completed')
                     continue # Skip
                 if 'restart' in ticket['summary']:
                     if lastResponse > daysSince(5) and lastBoot > daysSince(19):
@@ -312,7 +314,7 @@ for device in assetList['assets']:
                             {'oID': ticket['id'], 
                             'oSMRY': ticket['summary']}]
                         ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
-                elif 'computer is' in ticket['summary']:
+                elif 'running an' in ticket['summary'] or 'no longer supported' in ticket['summary'] or 'computer is' in ticket['summary']:
                     if osChecking == True and osDetails not in [2,3,4]:
                         ticketPayloadCreator('close me', ticket['id'], 'Complete')
                     if update == []:
@@ -342,13 +344,13 @@ for device in assetList['assets']:
             baseString = f'{device["key_field"]} '
             
             osStrings =  {
-                '2':f'is no longer supported and should be replaced',
+                '2': f'is no longer supported and should be replaced',
                 '3': f'is running an unsupported version of {osMainRaw}',
                 '4': f'is running an outdated version of {osMain} and needs to be updated',
             }
             
             # Does not alert for possibly unsupported for now.
-            ticketPayloadCreator(genericString + osStrings[str(osDetails)], existingTicketID=False)
+            ticketPayloadCreator(genericString + ' ' + osStrings[str(osDetails)], existingTicketID=False)
         if lastResponse > daysSince(5) and lastBoot < daysSince(19):
             print("Restart overdue") # DEBUG
             ticketPayloadCreator(f"{genericString} requires a restart. Last restarted {lastBootString}", existingTicketID=False)
