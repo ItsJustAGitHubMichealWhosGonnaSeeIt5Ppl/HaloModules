@@ -4,8 +4,8 @@ import json
 
 # Local modules
 import modules.HaloPSA.HaloV2 as Halo
-from modules.miscModules import daysSince, valueExtract
-from modules.msoftModules import winCheck,customFieldCheck
+from modules.miscModules import daysSince, valueExtract,customFieldCheck
+from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
 from modules.macModules import macCheck
 
@@ -76,15 +76,16 @@ for device in assetList['assets']:
     """
 
     print(f'{datetime.now()}: Re-formatting data')
+    
     # Format output from workstations for Halo
     avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 else '2' # Check for bitdefender #TODO #32 add detection for other AVs
     activeChecks = '1' if int(nAbleDetails['checks']['@count']) > 0 else '2' # Active checks on device (1 = yes)
 
     # AV Checks (1 = yes)
-    optionalList += customFieldCheck(156,'1' if int(nAbleDetails['mavbreck']) == 1 else '2')
+    optionalList += customFieldCheck(156,avCheck)
     
     # Active Checks (1 = yes)
-    optionalList += customFieldCheck(160,'1' if int(nAbleDetails['checks']['@count']) > 0 else '2')
+    optionalList += customFieldCheck(160,activeChecks)
 
     # Date checks, commenting these out will likely cause chaos
     lastResponse = date.fromisoformat(nAbleDetails['lastresponse'][:10]) if nAbleDetails['lastresponse'] != '0000-00-00 00:00:00' else "Not Available"
@@ -191,8 +192,9 @@ for device in assetList['assets']:
     # Create ticket for devices that need reboot
     userItem = None
     if  len(haloDetailExpanded['users']) != 0: # Asset already has a user
-        userID = haloDetailExpanded['users'][0]['id']
         print(f'{datetime.now()}: Device already has a user')
+        userID = haloDetailExpanded['users'][0]['id']
+        
     else: # Asset does not have a user
         print(f'{datetime.now()}: Device does not have a user, trying to match')
         userID = None
@@ -218,6 +220,7 @@ for device in assetList['assets']:
 
     print(f'{datetime.now()}: Attempting to update asset...')
     # Send information to Halo 
+    
     payload = json.dumps([{ # Device update payload
         "_dontaddnewfields": True,
         "isassetdetails": True,
@@ -226,21 +229,11 @@ for device in assetList['assets']:
         "users": userItem if userItem != None else ''}])
         # Attempt to update device if debug mode disabled
     if debugOnly == False:
-        attemptUpdate = hAssets.update(payload)
+        hAssets.update(payload)
         print(f'{datetime.now()}: Asset updated')
     
-    def ticketPayloadCreator(ticketString,existingTicketID=False,action='alert',**extras): # Sends payload to halo and creates ticket
-        if action.lower() == 'merge':
-            payload = json.dumps([{
-            'id': existingTicketID,
-            'merged_into_id': extras['newID'] # Mark ticket as completed.
-            }])
-        elif action == 'Complete':
-            payload = json.dumps([{
-            'id': existingTicketID,
-            'status_id': '20' # Mark ticket as completed.
-            }])
-        elif existingTicketID != False:
+    def ticketPayloadCreator(ticketString,existingTicketID=False,action='alert'): # Sends payload to halo and creates ticket
+        if existingTicketID is not False:
             payload = json.dumps([{
             'id': existingTicketID[0],
             "summary": ticketString,
@@ -289,7 +282,7 @@ for device in assetList['assets']:
                     continue # Skip
                 if 'restart' in ticket['summary']:
                     if lastResponse > daysSince(5) and lastBoot > daysSince(19):
-                        ticketPayloadCreator('close me', ticket['id'], 'Complete') # Close ticket if issue no longer present
+                        hTickets.close(ticket['id']) # Close ticket if issue no longer present
                     if restart == []:
                         restart = [
                         {'rID': ticket['id'], 
@@ -301,10 +294,10 @@ for device in assetList['assets']:
                         else:
                             oldID = restart[0]['rID']
                             newID = ticket['id']
-                        ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
+                        hTickets.merge(oldID,newID)
                 elif 'online' in ticket['summary']:
                     if lastResponse > daysSince(30):
-                         ticketPayloadCreator('close me', ticket['id'], 'Complete')
+                        hTickets.close(ticket['id'])
                     if offline == []:
                         offline = [
                         {'oID': ticket['id'], 
@@ -319,10 +312,10 @@ for device in assetList['assets']:
                             offline = [
                             {'oID': ticket['id'], 
                             'oSMRY': ticket['summary']}]
-                        ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
+                        hTickets.merge(oldID,newID)
                 elif 'running an' in ticket['summary'] or 'no longer supported' in ticket['summary'] or 'computer is' in ticket['summary']:
                     if osChecking == True and osDetails not in [2,3,4]:
-                        ticketPayloadCreator('close me', ticket['id'], 'Complete')
+                        hTickets.close(ticket['id'])
                     if update == []:
                         update = [
                         {'uID': ticket['id'], 
@@ -334,11 +327,12 @@ for device in assetList['assets']:
                         else:
                             oldID = update[0]['uID']
                             newID = ticket['id']
-                        ticketPayloadCreator('merge me',oldID,'merge',newID=newID)
+                        hTickets.merge(oldID,newID)
                     
         return restart if restart != [] else False, offline if offline != [] else False, update if update != [] else False
     
-    # Terrible awful please fix
+    # ^ Terrible awful please fix ^
+    
     print(f'{datetime.now()}: Checking open tickets for asset')
     deviceTickets = openTicketMatch()
 
