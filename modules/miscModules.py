@@ -45,3 +45,8 @@ def customFieldCheck(id,value):
         {"id": id, 
         "value": value}]
     return listItem
+
+# Exit the script early with some text
+def gentleError(Text='Undefined Error'):
+    print('[ERROR]',Text)
+    exit()

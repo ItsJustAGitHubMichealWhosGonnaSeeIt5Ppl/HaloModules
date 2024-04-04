@@ -9,7 +9,7 @@ import requests
 import urllib.parse
 import json
 import os
-
+from modules.miscModules import gentleError
 
 # CONSTANTS
 HALO_CLIENT_ID = os.getenv("HALO_CLIENT_ID") 
@@ -20,20 +20,51 @@ HALO_AUTH_URL = os.getenv('HALO_AUTH_URL')
 assetURL = HALO_API_URL+ '/asset/'
 
 
-# Headers
+# Confirm variables are present
+nodata = [None,'']
+if HALO_CLIENT_ID in nodata or HALO_SECRET in nodata or HALO_API_URL in nodata or HALO_AUTH_URL in nodata:
+    gentleError('Missing env file, Fill out "example.env" and rename to ".env"')  
 
-def responseChecker(request,returnErrors=False):
-    """ Work in Progress, halo code detection """
+
+
+
+def responseParser(request,Verbose=False):
+    """ Halo Response parser(?)
+
+    Args:
+        request (requests.models.Response): Halo API request
+        Verbose (bool, optional): Return extra details about response. Defaults to False.
+
+    Returns:
+        any: API content and non critical error messages
+    """
     code = request.status_code
+    
+    # Invalid URL
+    if code in [404]:
+        gentleError(f'404 -  The specified URL is invalid. URL: {request.url}')
+    content = json.loads(request.content)
+    
     # Success
     if code in [200,201]:
-        if returnErrors==True:
-            return 'Success', json.loads(request.content)
+        if Verbose==True:
+            return 'Success', content
         else:
-            return json.loads(request.content)
+            return content
+
+    elif code in [401]:
+        
+        # Return clearer errors
+        if content["error_description"] == 'The specified client credentials are invalid.':
+            # Specify it is the client secret that is wrong, not the client ID.
+            gentleError('The specified \'client_secret\' is invalid')
+        else:
+            gentleError(content["error_description"])
+            
     # Add unique failures as found
+    # If secret, client ID, or URL are wrong, error 401 is returned
     else:
-        if returnErrors==True:
+        if Verbose==True:
             return 'Error',f'{code} - Other failure'
         else:
             return f'{code} - Other failure'
@@ -52,8 +83,8 @@ def createToken():
     }
     
     request = requests.post(HALO_AUTH_URL, headers=authheader, data=urllib.parse.urlencode(payload)) # Request auth token
-    response = responseChecker(request,True)
-    if response[0] is 'Success':
+    response = responseParser(request,True)
+    if response[0] == 'Success':
         return response[1]['access_token']
     else:
         return response
@@ -76,13 +107,13 @@ class asset():
         """Get a single halo asset's details.
         ID = Asset ID"""
         request = requests.get(assetURL + str(id) +'?includedetails=True', headers = self.headerJSON)
-        return responseChecker(request)
+        return responseParser(request)
 
     
     def getAll(self):
         """ Replaces Returns all Halo assets"""
         request = requests.get(assetURL, headers = self.headerJSON)
-        return responseChecker(request)
+        return responseParser(request)
     
     def search(self,query):
         """ Search Halo assets 
@@ -93,7 +124,7 @@ class asset():
         """ Update asset.  ID provided in Payload (for now.) 
         Payload should be formatted with json.dumps, will move that bit in here eventually."""
         request = requests.post(assetURL, headers = self.headerJSON, data=payload)
-        return responseChecker(request)
+        return responseParser(request)
 
     
     
@@ -111,13 +142,13 @@ class ticket():
         """ Create a ticket 
         Payload must be formatted for now, will create a formatting tool later"""
         request = requests.post(HALO_API_URL+ '/tickets/', headers = self.headerJSON, data=payload)
-        return responseChecker(request)
+        return responseParser(request)
 
     def search(self,query):
         """ Search ticket using Query (Later query will be its own thing so its easier to use) """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/tickets?' + query, headers = self.headerJSON)
-        return responseChecker(request)
+        return responseParser(request)
 
 
 
