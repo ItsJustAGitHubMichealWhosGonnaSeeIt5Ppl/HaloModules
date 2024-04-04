@@ -4,7 +4,7 @@ import json
 
 # Local modules
 import modules.HaloPSA.HaloV2 as Halo
-from modules.miscModules import daysSince, valueExtract,customFieldCheck
+from modules.miscModules import daysSince, valueExtract, customFieldCheck
 from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
 from modules.macModules import macCheck
@@ -27,7 +27,7 @@ existingOnly = True # Only update existing asset tickets, do not scan an asset i
 today = date.today()
 noneDate = date.fromisoformat("1970-01-01")
 
-
+# Halo.invoiceActivator()
 # Create Halo Variables
 hAssets = Halo.asset()
 hTickets = Halo.ticket()
