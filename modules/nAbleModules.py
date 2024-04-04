@@ -14,6 +14,7 @@ NABLE_KEY = os.getenv("NABLE_KEY")
 NABLE_API_URL = f"https://www.systemmonitor.co.uk/api/?apikey={NABLE_KEY}&service=" # Only works with UK instances.
 
 
+
 def getN_AbleInfo(deviceID):
     # Returns N-Able device information. Input deviceID.
     # Halo stores the deviceID as 'third party ID'

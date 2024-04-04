@@ -26,8 +26,6 @@ if HALO_CLIENT_ID in nodata or HALO_SECRET in nodata or HALO_API_URL in nodata o
     gentleError('Missing env file, Fill out "example.env" and rename to ".env"')  
 
 
-
-
 def responseParser(request,Verbose=False):
     """ Halo Response parser(?)
 
@@ -47,13 +45,14 @@ def responseParser(request,Verbose=False):
     
     # Success
     if code in [200,201]:
+        # 201 = Created
+        # 200 = OK
         if Verbose==True:
-            return 'Success', content
+            return request.reason, content
         else:
             return content
 
     elif code in [401]:
-        
         # Return clearer errors
         if content["error_description"] == 'The specified client credentials are invalid.':
             # Specify it is the client secret that is wrong, not the client ID.
@@ -207,8 +206,6 @@ def userSearch(query):
     response = json.loads(request.content)
     return response
     
-
-
 
 def invoiceActivator(ids=None):
     """ Set invoices to Active
