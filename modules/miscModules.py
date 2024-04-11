@@ -3,6 +3,7 @@
 
 # Imports
 from datetime import datetime, date, timedelta
+import requests 
 
 
 """ Created by ItsAGithubMichealWhosGonnaSeeIt5Ppl
@@ -50,3 +51,18 @@ def customFieldCheck(id,value):
 def gentleError(Text='Undefined Error'):
     print('[ERROR]',Text)
     exit()
+    
+def requestSend(rType,data):
+    while attempts < 5 and processed == False:
+            try:
+                if rType == 'post':
+                    request = requests.post(data)
+                elif rType =='get':
+                    request = requests.get(data)
+                processed = True
+            except(ConnectionError):
+                attempts +=1
+    if processed != True:
+        gentleError('Connection error')
+    else:
+        return request

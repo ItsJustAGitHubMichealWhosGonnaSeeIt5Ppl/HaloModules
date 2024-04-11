@@ -16,7 +16,7 @@ from modules.macModules import macCheck
 # Toggles #TODO #10 Find a better place for these(webUI?)
 
 createAlertTickets = False # Enable ticket creation
-osChecking = True # Enable checking of OS version
+osChecking = False # Enable checking of OS version
 debugOnly = False # Disable asset updating
 forceUpdate = True #Update assets even if they have already been checked today
 existingOnly = True # Only update existing asset tickets, do not scan an asset if there is no currently active ticket.
@@ -315,7 +315,7 @@ for device in assetList['assets']:
                         hTickets.merge(oldID,newID)
                 elif 'running an' in ticket['summary'] or 'no longer supported' in ticket['summary'] or 'computer is' in ticket['summary']:
                     if osChecking == True and osDetails not in [2,3,4]:
-                        hTickets.close(ticket['id'])
+                        hTickets.updateStatus(ticket['id'])
                     if update == []:
                         update = [
                         {'uID': ticket['id'], 

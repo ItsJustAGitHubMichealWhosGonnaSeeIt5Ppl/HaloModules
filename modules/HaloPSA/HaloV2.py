@@ -83,7 +83,7 @@ def createToken():
     
     request = requests.post(HALO_AUTH_URL, headers=authheader, data=urllib.parse.urlencode(payload)) # Request auth token
     response = responseParser(request,True)
-    if response[0] == 'Success':
+    if response[0] == 'OK':
         return response[1]['access_token']
     else:
         return response
@@ -101,6 +101,7 @@ class asset():
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' +  token
             }
+    
     
     def get(self,id):
         """Get halo asset information
@@ -132,9 +133,20 @@ class asset():
     def update(self,payload):
         """ Update asset.  ID provided in Payload (for now.) 
         Payload should be formatted with json.dumps, will move that bit in here eventually."""
-        request = requests.post(assetURL, headers = self.headerJSON, data=payload)
-
-        return responseParser(request)
+        
+        # Allow retries in case connection times out (Have not seen this happen until today 11.04.2024)
+        attempts = 0
+        processed = False
+        while attempts < 5 and processed == False:
+            try:
+                request = requests.post(assetURL, headers = self.headerJSON, data=payload)
+                processed = True
+            except(ConnectionError):
+                attempts +=1
+        if processed != True:
+            gentleError('Connection error')
+        else:
+            return responseParser(request)
     
     def updateRaw(self,deviceID,fields,**data):
         """ Working on it """
@@ -171,8 +183,8 @@ class ticket():
         """Merge two tickets
 
         Args:
-            existingID (interger): ID of old ticket
-            newID (interger): ID of ticket old ticket should be merged into
+            existingID (INT): ID of old ticket
+            newID (INT): ID of ticket old ticket should be merged into
 
         Returns:
             JOSN: JSON formatted payload (merges, no need to send this anywhere)
@@ -198,7 +210,6 @@ class ticket():
         if type(ID) is not list:
             ID = [ID]
         for ticID in ID:
-            payload
             payload = json.dumps([{
                     'id': ticID,
                     'status_id': str(statusID) # Mark ticket as completed.
