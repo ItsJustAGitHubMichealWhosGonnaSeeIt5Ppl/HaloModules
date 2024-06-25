@@ -156,7 +156,8 @@ class asset():
         "fields": fields,
         "id": f"{deviceID}", # Device ID
         "users": data['User'] if data['User'] is not None else ''}])
-    
+
+  
 class ticket():
     def __init__(self):
         token = createToken()
@@ -219,49 +220,7 @@ class ticket():
             
         return payloads
 
-    
 
-
-
-
-def productUpdate(updateField,originalText,replacementText):
-    """ Update a halo product by value. 
-    Requires token, field to search on/update, text to search, text to replace with.
-    """
-    headers = { # Header with token
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + mainToken
-        }
-    def updateItemByID(ID,originalStr):
-        payload = json.dumps([{
-        updateField: originalStr.replace(originalText,replacementText),
-        "id": ID
-        }])
-        attemptUpdate = requests.post(HALO_API_URL+ '/item', headers = headers, data=payload)
-        return attemptUpdate.status_code
-
-    request = requests.get(HALO_API_URL+ '/item', headers = headers)
-    itemsList = json.loads(request.content)['items']
-    for item in itemsList:
-        if item == 'more': # Shows only 100 by default, this allows it to cycle through the remaining ones 
-            item = item['more']
-        if updateField in item:
-            if originalText in item[updateField]:
-                print(f'[{item["id"]}] {item["name"]}\n - {item[updateField]}') # Original string
-                attemptUpdate = updateItemByID(item["id"],item[updateField])
-                print(attemptUpdate) # Status of attempted assetUpdate
-                
-
-def productDB():
-    #TODO create DB for products to allow for easier searching, updating, etc.
-    sqlQuery = "INSERT OR UPDATE OR IGNORE INTO (tbd) values=()"
-    sqlData = ""
-    pass
-
-### Testing the above tool
-# originalText = 'for (contract start date) - (contract end date) - billed monthly'
-# newText = 'for contract period $CONTRACTSTARTDATE - $CONTRACTENDDATE (billed monthly)'
-# productUpdate(getHaloToken(),'description',originalText,newText)
 
 
 
@@ -276,11 +235,11 @@ def userSearch(query):
         return 'Failed to get users'
     response = json.loads(request.content)
     return response
-    
+
 
 def invoiceActivator(ids=None):
     """ Set invoices to Active
-    If no IDs sent, all invoices will be set to Active """
+    If no IDs are sent, all invoices will be set to Active """
     headers = { # Header with token
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + mainToken
@@ -327,6 +286,114 @@ def manualTokenUpdate(key,id):
     return attemptUpdate
 
 
+class currency():
+    """ Check currency information
+    
+    Useful to convert pricing from secondary currency to primary currency.
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+        }
+    
+    def getAll(self):
+        """ 
+        Get all active currencies
+        """
+        request = requests.get(HALO_API_URL + '/Currency', headers = self.headerJSON)
+        return responseParser(request)
+        
+
+class items():
+    """ Products (items) API 
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+        }
+    def getAll(self):
+        pass
+    
+    def getDetails(self, item):
+        """ Get details about an item
+
+        Args:
+            item INT: Item ID
+
+        Returns:
+            Dictionay: Item details
+        """
+        request = requests.get(HALO_API_URL + '/item/' + str(item) + '?includedetails=true', headers = self.headerJSON)
+        return responseParser(request)
+        
+    def search(self, query):
+        """ Search for an item
+
+        Args:
+            query DICT: Query dictionary
+
+        Returns:
+            Dictionary: Hopefully a list of items?
+        """
+        query = urllib.parse.urlencode(query)
+        request = requests.get(HALO_API_URL+ '/item?' + query, headers = self.headerJSON)
+        return responseParser(request)
+    
+    def create(self, payload):
+        pass
+    
+    def update(self, payload):
+        """ Update an existing item
+
+        Args:
+            payload DICT: Dictionary containing the fields that need updating
+
+        Returns:
+            Im not sure: Hopefully just a code saying SUCCESS?
+        """
+        payload = json.dumps([payload])
+        
+        postRequest = requests.post(HALO_API_URL+ '/item', headers = self.headerJSON, data = payload)
+        return responseParser(postRequest)
+
+
+### OLD SHIT ###
+
+def productUpdate(updateField,originalText,replacementText):
+    """ Update a halo product by value. 
+    Requires token, field to search on/update, text to search, text to replace with.
+    """
+    headers = { # Header with token
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + mainToken
+        }
+    def updateItemByID(ID,originalStr):
+        payload = json.dumps([{
+        updateField: originalStr.replace(originalText,replacementText),
+        "id": ID
+        }])
+        attemptUpdate = requests.post(HALO_API_URL+ '/item', headers = headers, data=payload)
+        return attemptUpdate.status_code
+
+    request = requests.get(HALO_API_URL+ '/item', headers = headers)
+    itemsList = json.loads(request.content)['items']
+    for item in itemsList:
+        if item == 'more': # Shows only 100 by default, this allows it to cycle through the remaining ones 
+            item = item['more']
+        if updateField in item:
+            if originalText in item[updateField]:
+                print(f'[{item["id"]}] {item["name"]}\n - {item[updateField]}') # Original string
+                attemptUpdate = updateItemByID(item["id"],item[updateField])
+                print(attemptUpdate) # Status of attempted assetUpdate
+                
+
+
 
 class payloadCreator():
     def PayloadCreator(ticketString,existingTicketID=False,action='alert',**extras): # Sends payload to halo and creates ticket
@@ -359,3 +426,16 @@ class payloadCreator():
                     "dont_do_rules": True, # Is this needed
                     }])
             print(existingTicketID)
+
+
+def productDB():
+    #TODO create DB for products to allow for easier searching, updating, etc.
+    sqlQuery = "INSERT OR UPDATE OR IGNORE INTO (tbd) values=()"
+    sqlData = ""
+    pass
+
+### Testing the above tool
+# originalText = 'for (contract start date) - (contract end date) - billed monthly'
+# newText = 'for contract period $CONTRACTSTARTDATE - $CONTRACTENDDATE (billed monthly)'
+# productUpdate(getHaloToken(),'description',originalText,newText)
+
