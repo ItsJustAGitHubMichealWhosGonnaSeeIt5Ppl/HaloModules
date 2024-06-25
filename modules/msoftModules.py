@@ -52,7 +52,7 @@ def msoftVerHistoryScraper(link):
     for y in oldReleases:
         if any(str(s) in str(y) for s in supportedOSList):
             oldReleaseDict = xmltodict.parse(str(y)) # Convert the supported OS version to a dict for easier data extraction
-            for x in oldReleaseDict['table']['tr']:
+            for x in oldReleaseDict['table']['tbody']['tr']:
                 if 'th' in x:
                     continue # Skips the table header. Probably a nicer way to do this, but I don't know how
                 sqlQuery = "INSERT OR REPLACE INTO win_versions_sub VALUES(?,?,?)"
