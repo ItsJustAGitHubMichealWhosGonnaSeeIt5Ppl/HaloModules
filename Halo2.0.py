@@ -20,7 +20,7 @@ osChecking = False # Enable checking of OS version
 debugOnly = False # Disable asset updating
 forceUpdate = True #Update assets even if they have already been checked today
 existingOnly = True # Only update existing asset tickets, do not scan an asset if there is no currently active ticket.
-
+currencyUpdate = True
 
 # // Code
 # Global Variables used to check how long a device has been online (day only)
@@ -33,6 +33,55 @@ hAssets = Halo.asset()
 hTickets = Halo.ticket()
 assetList = hAssets.getAll()
 
+
+if currencyUpdate == True:
+    # requires string in Internal Reference
+    # EG USD:P15C15
+    # Update currency on items
+    # Currently assumes item is recurring
+    hCurrency = Halo.currency()
+    hItem = Halo.items()
+    
+    usdOnlyQuery = {
+        'pageinate':'false',
+        'order':'name',
+        'advanced_search': [{
+            'filter_name':'internalreference',
+            'filter_type':4,
+            'filter_value':'USD'
+        }]}
+        
+    usdItems = hItem.search(usdOnlyQuery)
+    
+    ## 1 / (Exchange rate) will give correct currency conversion
+    
+    for currency in hCurrency.getAll():
+        if currency['code'] == 'USD':
+            USDtoGBP = 1 / currency['conversion_rate']
+            break
+    
+    
+    
+    for product in usdItems['items']:
+        gbpCost = str(int(product['internalreference'].split('C')[1]) * USDtoGBP)[0:5]
+        gbpPrice = str(int(product['internalreference'].split('C')[0].replace('USD:P','')) * USDtoGBP)[0:5]
+        newPayload = {
+            'id': product['id'],
+            'costprice': gbpCost,
+            "recurringcost": gbpCost,
+            
+            "baseprice": gbpPrice,
+            "recurringprice": gbpPrice,
+            
+            "update_recurring_invoice_price": 'true',
+            "update_recurring_invoice_cost": 'true',
+            }
+        updateAttempt = hItem.update(newPayload)
+        print(updateAttempt)
+    
+    
+        
+    
 
 for device in assetList['assets']:
 
@@ -282,7 +331,7 @@ for device in assetList['assets']:
                     continue # Skip
                 if 'restart' in ticket['summary']:
                     if lastResponse > daysSince(5) and lastBoot > daysSince(19):
-                        hTickets.close(ticket['id']) # Close ticket if issue no longer present
+                        hTickets.updateStatus(ticket['id']) # Close ticket if issue no longer present
                     if restart == []:
                         restart = [
                         {'rID': ticket['id'], 
@@ -297,7 +346,7 @@ for device in assetList['assets']:
                         hTickets.merge(oldID,newID)
                 elif 'online' in ticket['summary']:
                     if lastResponse > daysSince(30):
-                        hTickets.close(ticket['id'])
+                        hTickets.updateStatus(ticket['id'])
                     if offline == []:
                         offline = [
                         {'oID': ticket['id'], 
@@ -345,7 +394,7 @@ for device in assetList['assets']:
             
             osStrings =  {
                 '2': f'is no longer supported and should be replaced',
-                '3': f'is running an unsupported version of {osMainRaw}',
+                '3': f'is running an unsupported version of {osMain}',
                 '4': f'is running an outdated version of {osMain} and needs to be updated',
             }
             
