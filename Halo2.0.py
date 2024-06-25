@@ -9,18 +9,44 @@ from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
 from modules.macModules import macCheck
 
+
+version = '0.0.1'
+
+
+
+
 # TODO #11 Only scan devices in "hiatus" or with "no checks" on occasion 
 #TODO Before making public, status IDs must be switched
 
 #TODO #3 When creating macOS update tickets, note the device type in the ticket body.
-# Toggles #TODO #10 Find a better place for these(webUI?)
 
-createAlertTickets = False # Enable ticket creation
-osChecking = False # Enable checking of OS version
-debugOnly = False # Disable asset updating
-forceUpdate = True #Update assets even if they have already been checked today
-existingOnly = True # Only update existing asset tickets, do not scan an asset if there is no currently active ticket.
-currencyUpdate = True
+settings = {
+    'createAlertTickets': False, # Enable ticket creation
+    'osChecking': False, # Enable checking of OS version
+    'forceUpdate': False, #Update assets even if they have already been checked today
+    'existingOnly': False, # Only update existing asset tickets, do not scan an asset if there is no currently active ticket.
+    'currencyUpdate': False,
+    'debugOnly': False, # Disable asset updating
+}
+
+settingsTextFriendly = {
+    'createAlertTickets': 'Should alert tickets be created/updated?', 
+    'existingOnly': 'Should only existing alert tickets be updated?',
+    'osChecking': 'Should the OS version/status be checked?', 
+    'forceUpdate': 'Should devices be re-checked, even if they were checked in the last 24 hours?', 
+    'currencyUpdate': 'Should currency updates be done on items?',
+    'debugOnly': 'DEBUG MODE?',
+}
+
+print(f'Halo-Python script tool Version: {version}')
+print('N-Able asset sync settings\n')
+for setting, text in settingsTextFriendly.items():
+    needValidInput = True
+    while needValidInput == True:
+        userInput = input(text + ' Y/N: ')
+        if userInput.capitalize() in ['Y','N']:
+            needValidInput = False
+    settings[setting] = False if userInput.capitalize() == 'N' else True
 
 # // Code
 # Global Variables used to check how long a device has been online (day only)
@@ -34,7 +60,7 @@ hTickets = Halo.ticket()
 assetList = hAssets.getAll()
 
 
-if currencyUpdate == True:
+if settings['currencyUpdate'] == True:
     # requires string in Internal Reference
     # EG USD:P15C15
     # Update currency on items
@@ -99,12 +125,12 @@ for device in assetList['assets']:
     haloFieldNames = ['id','value']
     
     print(f'{datetime.now()}: Got details from Halo')
-    if existingOnly == True and haloDetailExpanded['open_ticket_count'] == 0:
+    if settings['existingOnly'] == True and haloDetailExpanded['open_ticket_count'] == 0:
         print(f'{datetime.now()}: existingOnly is enabled and this asset has no tickets, skipping')
         continue
     
     try: # Skips recently checked dvices. Reduces API requests to NAble, which can be quite slow.
-        if forceUpdate == False and  datetime.fromisoformat(valueExtract(haloDetailExpanded['fields'],[159],haloFieldNames)[159]) > daysSince(1,'time'):
+        if settings['forceUpdate'] == False and  datetime.fromisoformat(valueExtract(haloDetailExpanded['fields'],[159],haloFieldNames)[159]) > daysSince(1,'time'):
             print(f'Skipped {device["id"]}')
             continue
     except: # Try except used in case field does not have any data
@@ -114,9 +140,6 @@ for device in assetList['assets']:
     if  nAbleDetails == False: # Skip device if N-Able returns an error
         continue
     print(f'{datetime.now()}: Got details from N-Able')
-
-
-
 
   
     """ List of Halo custom fields
@@ -194,7 +217,7 @@ for device in assetList['assets']:
         osMain = 'Unknown'
 
     # Windows and macOS checks
-    if osChecking == True: # Confirm OS checking is enabled, check if current device is a mac
+    if settings['osChecking'] == True: # Confirm OS checking is enabled, check if current device is a mac
         if nAbleValues != 'No checks' and 'Windows' in osMain and nAbleCheckIDs[0] in nAbleValues.keys() and nAbleValues[nAbleCheckIDs[0]] not in [None,'Script awaiting download','Script timed out']:
             print(f'{datetime.now()}: Checking Windows versions')
             winDetails = winCheck(nAbleValues[nAbleCheckIDs[0]])
@@ -277,7 +300,7 @@ for device in assetList['assets']:
         "id": f"{device['id']}", # Device ID
         "users": userItem if userItem != None else ''}])
         # Attempt to update device if debug mode disabled
-    if debugOnly == False:
+    if settings['debugOnly'] == False:
         hAssets.update(payload)
         print(f'{datetime.now()}: Asset updated')
     
@@ -363,7 +386,7 @@ for device in assetList['assets']:
                             'oSMRY': ticket['summary']}]
                         hTickets.merge(oldID,newID)
                 elif 'running an' in ticket['summary'] or 'no longer supported' in ticket['summary'] or 'computer is' in ticket['summary']:
-                    if osChecking == True and osDetails not in [2,3,4]:
+                    if ['osChecking'] == True and osDetails not in [2,3,4]:
                         hTickets.updateStatus(ticket['id'])
                     if update == []:
                         update = [
@@ -386,10 +409,10 @@ for device in assetList['assets']:
     deviceTickets = openTicketMatch()
 
     # Check that DNC isnt true, the device has active checks, and tickets should be created.
-    if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues[161] if 161 in haloValues else 2)   != 1 and createAlertTickets == True: 
+    if lastBootString != 'Not Available' and activeChecks == "1" and (haloValues[161] if 161 in haloValues else 2)   != 1 and settings['createAlertTickets'] == True: 
 
         genericString = 'Your computer'
-        if osChecking == True and osDetails in [2,3,4]: # Out of date device tickets
+        if settings['osChecking'] == True and osDetails in [2,3,4]: # Out of date device tickets
             baseString = f'{device["key_field"]} '
             
             osStrings =  {
