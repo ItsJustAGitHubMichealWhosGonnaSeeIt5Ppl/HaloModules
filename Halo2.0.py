@@ -10,9 +10,9 @@ from modules.nAbleModules import getN_AbleInfo
 from modules.macModules import macCheck
 
 
-version = '0.0.1'
-
-
+version = '0.0.2'
+# Now checks for EDR and MAV
+# Now checks for Bitlocker script and exports this data into Halo
 
 
 # TODO #11 Only scan devices in "hiatus" or with "no checks" on occasion 
@@ -103,11 +103,8 @@ if settings['currencyUpdate'] == True:
             "update_recurring_invoice_cost": 'true',
             }
         updateAttempt = hItem.update(newPayload)
-        print(updateAttempt)
-    
-    
-        
-    
+        print(updateAttempt) 
+
 
 for device in assetList['assets']:
 
@@ -145,12 +142,40 @@ for device in assetList['assets']:
     """ List of Halo custom fields
     156 = HasAV - 1/Yes, 2/No
     160 = hasChecks - 1/Yes, 2/No
+    164 = Bitlocker Identifier - [text]
+    165 = Bitlocker Key - [text]
     """
 
     print(f'{datetime.now()}: Re-formatting data')
     
+    avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 else '2' # Check for bitdefender
+    
+    # Needed for bitlocker check
+    bitID = None
+    bitKey = None
+    
+    if int(nAbleDetails['checks']['@count']) > 0:
+        for check in nAbleDetails['checks']['check']:
+            if isinstance(check,str):
+                continue
+            
+            # Get bitlocker keys from script check
+            if check['description'] == 'Script Check - Enable and Collect Bitlocker Keys' and check['extra'] != None:
+                extraData = check['extra'].splitlines()
+
+                for dataLine in extraData:
+                    if 'Encrypted Drive Found - 1 - Identifier: ' in dataLine:
+                        bitID = dataLine.split('{')[1].strip('}')
+                    elif 'Encrypted Drive Found - 1 - Key::' in dataLine:
+                        bitKey = dataLine.split('Key:: ')[1]
+                ## extra
+                
+            # Check for EDR since there isnt a "feature" to check for this in the API
+            if check['description'] == 'Integration Check - EDR - Agent Health Status':
+                avCheck = '1'
+                
+    
     # Format output from workstations for Halo
-    avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 else '2' # Check for bitdefender #TODO #32 add detection for other AVs
     activeChecks = '1' if int(nAbleDetails['checks']['@count']) > 0 else '2' # Active checks on device (1 = yes)
 
     # AV Checks (1 = yes)
@@ -179,7 +204,12 @@ for device in assetList['assets']:
         {"id": "158", # LLast Response Date
             "value": nAbleDetails['lastresponse'],},
         {"id": "157", # Last Boot Date TODO # Make this modular
-            "value": nAbleDetails['lastboot'] if lastBootString != "Not Available" else None}]
+            "value": nAbleDetails['lastboot'] if lastBootString != "Not Available" else None},
+        {"id": "164", # Bitlocker ID
+            "value": bitID if bitID != None else None},
+        {"id": "165", # Bitlocker Key
+            "value": bitKey if bitID != None else None}
+        ]
     print(f'{datetime.now()}: Finished initial data reformat')
     
 

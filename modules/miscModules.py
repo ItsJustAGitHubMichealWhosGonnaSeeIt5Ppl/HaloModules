@@ -29,9 +29,15 @@ def daysSince(day,value='day'):
 def valueExtract(customFields,IDs,fieldName):
     # Extract values from custom fields
     fieldsDict = {}
-    for field in customFields:
-        if field[fieldName[0]] in IDs and fieldName[1] in field:
-            fieldsDict[field[fieldName[0]]] = field[fieldName[1]]
+    
+    # Fix for single check devices
+    if isinstance(customFields,dict):
+            if customFields[fieldName[0]] in IDs and fieldName[1] in customFields:
+                fieldsDict[customFields[fieldName[0]]] = customFields[fieldName[1]]
+    else:
+        for field in customFields:
+            if field[fieldName[0]] in IDs and fieldName[1] in field:
+                fieldsDict[field[fieldName[0]]] = field[fieldName[1]]
     return fieldsDict
 
 def customFieldCheck(id,value):

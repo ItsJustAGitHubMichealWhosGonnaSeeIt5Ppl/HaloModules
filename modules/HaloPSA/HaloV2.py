@@ -111,9 +111,11 @@ class asset():
 
         Returns:
             list: Halo asset details
-        """        
+        """    
         request = requests.get(assetURL + str(id) +'?includedetails=True', headers = self.headerJSON)
         return responseParser(request)
+
+            
 
     
     def getAll(self):
@@ -141,7 +143,7 @@ class asset():
             try:
                 request = requests.post(assetURL, headers = self.headerJSON, data=payload)
                 processed = True
-            except(ConnectionError):
+            except:
                 attempts +=1
         if processed != True:
             gentleError('Connection error')
