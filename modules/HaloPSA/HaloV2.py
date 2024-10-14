@@ -365,6 +365,32 @@ class items():
         return responseParser(postRequest)
 
 
+class invoices():
+    """Invoice endpoint(?)
+    """
+    
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+        }
+    
+    def searchRecurring(self, query):
+        """ Search for a recurring invoice
+
+        Args:
+            query DICT: Query dictionary
+
+        Returns:
+            Dictionary: Hopefully a list of recurring invoices
+        """
+        query = urllib.parse.urlencode(query)
+        request = requests.get(HALO_API_URL+ '/recurringinvoice?' + query, headers = self.headerJSON)
+        return responseParser(request)
+
+
 ### OLD SHIT ###
 
 def productUpdate(updateField,originalText,replacementText):

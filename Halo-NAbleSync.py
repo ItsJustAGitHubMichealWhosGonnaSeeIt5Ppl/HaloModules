@@ -288,3 +288,24 @@ for device in assetList['assets']:
         debugText(f'{device['id']} updated successfully',f'INFO-{device['id']}')
     elif settings['debugOnly'] == True:
         debugText('Debug mode enabled, asset not upated',f'INFO-{device['id']}')
+
+    
+    if activeChecks == '1':
+        hInvoices = Halo.invoices()
+        
+        
+        queryLoad = {
+            'pageinate':'false',
+            "client_id": device['client_id'], # Client ID 
+            }
+        invoices = hInvoices.searchRecurring(queryLoad)
+        if invoices['invoices'] > 0:
+            print('client has an invoice')
+        else:
+            print(f'No invoice for {device['client_id']}')
+            input()
+    else:
+        print('no checks')
+        
+        
+        
