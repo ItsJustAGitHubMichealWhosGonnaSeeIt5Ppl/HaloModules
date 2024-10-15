@@ -3,7 +3,7 @@ from datetime import datetime, date
 import json
 
 # Local modules
-from modules.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch, searchHaloTicket, invoiceActivator
+from archive.haloModules import getHaloToken, getHaloAssets, updateHaloAsset, createHaloTicket, userSearch, searchHaloTicket, invoiceActivator
 from modules.miscModules import daysSince, valueExtract
 from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
