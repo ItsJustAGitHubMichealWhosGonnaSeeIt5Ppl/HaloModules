@@ -9,7 +9,10 @@ import requests
 import urllib.parse
 import json
 import os
-from modules.miscModules import gentleError
+
+def gentleError(Text='Undefined Error'):
+    print('[ERROR]',Text)
+    exit()
 
 # CONSTANTS
 HALO_CLIENT_ID = os.getenv("HALO_CLIENT_ID") 
@@ -128,9 +131,10 @@ class asset():
         return responseParser(request)
     
     def search(self,query):
-        """ Search Halo assets 
-        DOES NOT DO ANYTHING RIGHT NOW """
-        pass
+        """ Search Halo assets """
+        query = urllib.parse.urlencode(query)
+        request = requests.get(HALO_API_URL+ '/asset?' + query, headers = self.headerJSON)
+        return responseParser(request)
     
     def update(self,payload):
         """ Update asset.  ID provided in Payload (for now.) 
