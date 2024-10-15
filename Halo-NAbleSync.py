@@ -299,7 +299,7 @@ for device in assetList['assets']:
             "client_id": device['client_id'], # Client ID 
             }
         invoices = hInvoices.searchRecurring(queryLoad)
-        if invoices['invoices'] > 0:
+        if len(invoices['invoices']) > 0:
             print('client has an invoice')
         else:
             print(f'No invoice for {device['client_id']}')
