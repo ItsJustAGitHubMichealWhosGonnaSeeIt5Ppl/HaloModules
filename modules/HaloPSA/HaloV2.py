@@ -20,7 +20,8 @@ HALO_SECRET = os.getenv('HALO_SECRET')
 HALO_API_URL = os.getenv('HALO_API_URL') 
 HALO_AUTH_URL = os.getenv('HALO_AUTH_URL')
 
-assetURL = HALO_API_URL+ '/asset/'
+
+assetURL = HALO_API_URL+ '/asset/' # Deprecate/remove this
 
 
 # Confirm variables are present
@@ -29,7 +30,7 @@ if HALO_CLIENT_ID in nodata or HALO_SECRET in nodata or HALO_API_URL in nodata o
     gentleError('Missing env file, Fill out "example.env" and rename to ".env"')  
 
 
-def responseParser(request,Verbose=False):
+def _responseParser(request,Verbose=False):
     """ Halo Response parser(?)
 
     Args:
@@ -71,7 +72,6 @@ def responseParser(request,Verbose=False):
         else:
             return f'{code} - Other failure'
 
-
 def createToken():
     # Return auth token from Halo. 
     authheader = { # Required by Halo, don't ask me why
@@ -85,16 +85,31 @@ def createToken():
     }
     
     request = requests.post(HALO_AUTH_URL, headers=authheader, data=urllib.parse.urlencode(payload)) # Request auth token
-    response = responseParser(request,True)
+    response = _responseParser(request,True)
     if response[0] == 'OK':
         return response[1]['access_token']
     else:
         return response
 
-mainToken = createToken()
+mainToken = createToken() # Remove this
 
 
-class asset():
+#### Classes
+
+class actions():
+    def search():
+        pass
+    def get():
+        pass
+    def update():
+        """Update one or more actions"""
+        pass
+    def delete():
+        pass
+    
+
+
+class asset(): # Change this to assets
     """ Asset actions 
     Initialize by running this once on its own, then run actions"""
     def __init__(self):
@@ -104,8 +119,9 @@ class asset():
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' +  token
             }
-    
-    
+        
+        self.url = HALO_API_URL + '/asset'
+
     def get(self,id):
         """Get halo asset information
 
@@ -116,10 +132,7 @@ class asset():
             list: Halo asset details
         """    
         request = requests.get(assetURL + str(id) +'?includedetails=True', headers = self.headerJSON)
-        return responseParser(request)
-
-            
-
+        return _responseParser(request)
     
     def getAll(self):
         """Get all halo assets
@@ -128,18 +141,78 @@ class asset():
             list: List of assets OR error
         """        
         request = requests.get(assetURL, headers = self.headerJSON)
-        return responseParser(request)
+        return _responseParser(request)
     
-    def search(self,query):
-        """ Search Halo assets """
-        query = urllib.parse.urlencode(query)
-        request = requests.get(HALO_API_URL+ '/asset?' + query, headers = self.headerJSON)
-        return responseParser(request)
-    
+    def search(self,
+        pageinate:bool=False,
+        page_size:int=50,
+        page_no:int=1,
+        order:str =None,
+        orderdesc:bool=None,
+        search:str=None,
+        ticket_id:int=None,
+        client_id:int=None,
+        site_id:int=None,
+        username:str=None,
+        assetgroup_id:int=None,
+        assettype_id:int=None,
+        linkedto_id:int=None,
+        includeinactive:bool=None,
+        includeactive:bool=None,
+        includechildren:bool=None,
+        contract_id:int=None,
+        **others
+    ):
+        
+        
+        """Search Assets.  Supports unlisted parameters 
+
+        Args:
+            paginate (bool, optional): Whether to use Pagination in the response. Defaults to False.
+            page_size (int, optional): When using Pagination, the size of the page. Defaults to 50.
+            page_no (int, optional): When using Pagination, the page number to return. Defaults to 1.
+            order (str, optional): The name of the field to order by.
+            orderdesc (bool, optional): Whether to order ascending or descending. Defaults to decending sort.
+            search (str, optional): Filter by Assets with an asset field like your search.
+            ticket_id (int, optional): Filter by Assets belonging to a particular ticket. 
+            client_id (int, optional): 	Filter by Assets belonging to a particular client.
+            site_id (int, optional): Filter by Assets belonging to a particular site.
+            username (str, optional): Filter by Assets belonging to a particular user. 
+            assetgroup_id (int, optional): Filter by Assets belonging to a particular Asset group. 
+            assettype_id (int, optional): Filter by Assets belonging to a particular Asset type. 
+            linkedto_id (int, optional): Filter by Assets linked to a particular Asset. 
+            includeinactive (bool, optional): Include inactive Assets in the response. Defaults to False/No.
+            includeactive (bool, optional): _Include active Assets in the response. Defaults to True/Yes.
+            includechildren (bool, optional): Include child Assets in the response. Defaults to False/No.
+            contract_id (int, optional): Filter by Assets assigned to a particular contract.
+            
+        Returns:
+            _type_: Search results in _ form
+        """
+        
+        newVars = locals().copy()
+        queryDict = {}
+        
+        
+        for item, value in newVars.items():
+            pageinateToggle = False
+            if item == 'pageinate' and value == True:
+                pageinateToggle = True
+
+            if pageinateToggle == False and item in ['page_size','page_no']:
+                continue
+            
+            if value !=None:
+                queryDict.update({item : value})   
+ 
+        query = urllib.parse.urlencode(queryDict)
+        
+        request = requests.get(self.url + '?' + query, headers = self.headerJSON)
+        return _responseParser(request)
+        
     def update(self,payload):
         """ Update asset.  ID provided in Payload (for now.) 
         Payload should be formatted with json.dumps, will move that bit in here eventually."""
-        
         # Allow retries in case connection times out (Have not seen this happen until today 11.04.2024)
         attempts = 0
         processed = False
@@ -152,7 +225,7 @@ class asset():
         if processed != True:
             gentleError('Connection error')
         else:
-            return responseParser(request)
+            return _responseParser(request)
     
     def updateRaw(self,deviceID,fields,**data):
         """ Working on it """
@@ -163,7 +236,32 @@ class asset():
         "id": f"{deviceID}", # Device ID
         "users": data['User'] if data['User'] is not None else ''}])
 
-  
+
+class clients:
+    """Client endpoint
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+            }
+        self.url = HALO_API_URL + '/Client'
+    """Clients endpoint"""
+    
+    def search(self,
+               ):
+        pass
+    def get():
+        pass
+    def update():
+        """Update one or more clients"""
+        pass
+    def delete():
+        pass
+
+
 class ticket():
     def __init__(self):
         token = createToken()
@@ -177,14 +275,14 @@ class ticket():
         """ Create a ticket 
         Payload must be formatted for now, will create a formatting tool later"""
         request = requests.post(HALO_API_URL+ '/tickets/', headers = self.headerJSON, data=payload)
-        return responseParser(request)
+        return _responseParser(request)
 
     def search(self,query):
         """ Search ticket using Query (Later query will be its own thing so its easier to use) """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/tickets?' + query, headers = self.headerJSON)
 
-        return responseParser(request)
+        return _responseParser(request)
     
     def merge(self,existingID,newID):
         """Merge two tickets
@@ -310,7 +408,7 @@ class currency():
         Get all active currencies
         """
         request = requests.get(HALO_API_URL + '/Currency', headers = self.headerJSON)
-        return responseParser(request)
+        return _responseParser(request)
         
 
 class items():
@@ -336,7 +434,7 @@ class items():
             Dictionay: Item details
         """
         request = requests.get(HALO_API_URL + '/item/' + str(item) + '?includedetails=true', headers = self.headerJSON)
-        return responseParser(request)
+        return _responseParser(request)
         
     def search(self, query):
         """ Search for an item
@@ -349,7 +447,7 @@ class items():
         """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/item?' + query, headers = self.headerJSON)
-        return responseParser(request)
+        return _responseParser(request)
     
     def create(self, payload):
         pass
@@ -366,7 +464,7 @@ class items():
         payload = json.dumps([payload])
         
         postRequest = requests.post(HALO_API_URL+ '/item', headers = self.headerJSON, data = payload)
-        return responseParser(postRequest)
+        return _responseParser(postRequest)
 
 
 class invoices():
@@ -392,8 +490,30 @@ class invoices():
         """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/recurringinvoice?' + query, headers = self.headerJSON)
-        return responseParser(request)
+        return _responseParser(request)
 
+
+class Users():
+    """Users enpdpoint.  NOT THE SAME AS CLIENT ENDPOINT!
+
+    """
+    def search():
+        """ Search users"""
+        pass
+    
+    def get():
+        """Get specific user"""
+        pass
+    
+    def update():
+        """Update specific user"""
+        pass
+    
+    def delete():
+        """Delete user"""
+        pass
+    
+    
 
 ### OLD SHIT ###
 
