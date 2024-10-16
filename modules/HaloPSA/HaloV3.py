@@ -11,9 +11,6 @@ import json
 import os
 from modules.HaloPSA.functions import apiCaller
 
-def gentleError(Text='Undefined Error'):
-    print('[ERROR]',Text)
-    exit()
 
 # CONSTANTS
 HALO_CLIENT_ID = os.getenv("HALO_CLIENT_ID") 
@@ -28,50 +25,8 @@ assetURL = HALO_API_URL+ '/asset/' # Deprecate/remove this
 # Confirm variables are present
 nodata = [None,'']
 if HALO_CLIENT_ID in nodata or HALO_SECRET in nodata or HALO_API_URL in nodata or HALO_AUTH_URL in nodata:
-    gentleError('Missing env file, Fill out "example.env" and rename to ".env"')  
+    raise('Missing env file, Fill out "example.env" and rename to ".env"')  
 
-
-def _responseParser(request,Verbose=False):
-    """ Halo Response parser(?)
-
-    Args:
-        request (requests.models.Response): Halo API request
-        Verbose (bool, optional): Return extra details about response. Defaults to False.
-
-    Returns:
-        any: API content and non critical error messages
-    """
-    code = request.status_code
-    
-    # Invalid URL
-    if code in [404]:
-        gentleError(f'404 -  The specified URL is invalid. URL: {request.url}')
-    content = json.loads(request.content)
-    
-    # Success
-    if code in [200,201]:
-        # 201 = Created
-        # 200 = OK
-        if Verbose==True:
-            return request.reason, content
-        else:
-            return content
-
-    elif code in [401]:
-        # Return clearer errors
-        if content["error_description"] == 'The specified client credentials are invalid.':
-            # Specify it is the client secret that is wrong, not the client ID.
-            gentleError('The specified \'client_secret\' is invalid')
-        else:
-            gentleError(content["error_description"])
-            
-    # Add unique failures as found
-    # If secret, client ID, or URL are wrong, error 401 is returned
-    else:
-        if Verbose==True:
-            return 'Error',f'{code} - Other failure'
-        else:
-            return f'{code} - Other failure'
 
 def createToken():
     # Return auth token from Halo. 
@@ -86,7 +41,7 @@ def createToken():
     }
     
     request = requests.post(HALO_AUTH_URL, headers=authheader, data=urllib.parse.urlencode(payload)) # Request auth token
-    response = _responseParser(request,True)
+    response = request.reason, request.content
     if response[0] == 'OK':
         return response[1]['access_token']
     else:
@@ -122,26 +77,29 @@ class assets: # Change this to assets
             }
 
 
-    def get(self,id):
-        """Get halo asset information
-
+    def get(self,
+            id:int,
+            includedetails:bool=False,
+            includediagramdetails:bool=False,
+            ):
+        """
+        Get a single asset's details.
+        Supports all Halo parameters, even if not listed.  
+        Requires atleast ID to be provided
         Args:
-            id (int): Halo Asset ID
+            id (int): Asset ID
+            includedetails (bool, optional): Whether to include extra details (objects) in the response. Defaults to False.
+            includediagramdetails (bool, optional): Whether to include diagram details in the response. Defaults to False.
 
         Returns:
-            list: Halo asset details
-        """    
-        request = requests.get(assetURL + str(id) +'?includedetails=True', headers = self.headerJSON)
-        return _responseParser(request)
+            dict: Single asset details
+        """
+
+        newVars = locals().copy()
+        request = apiCaller(HALO_API_URL,'search','Asset',newVars,self.headerJSON)
+        response = request.getData()
+        return response
     
-    def getAll(self):
-        """Get all halo assets
-
-        Returns:
-            list: List of assets OR error
-        """        
-        request = requests.get(assetURL, headers = self.headerJSON)
-        return _responseParser(request)
     
     def search(self,
         pageinate:bool=False,
@@ -163,7 +121,9 @@ class assets: # Change this to assets
         contract_id:int=None,
         **others
     ):
-        """Search Assets.  Supports unlisted parameters 
+        """Search Assets.
+        Supports all Halo parameters, even if not listed.  
+        Running with no parameters will get all assets.
 
         Args:
             paginate (bool, optional): Whether to use Pagination in the response. Defaults to False.
@@ -193,6 +153,18 @@ class assets: # Change this to assets
         request = apiCaller(HALO_API_URL,'search','Asset',newVars,self.headerJSON)
         response = request.getData()
         return response
+    
+    @search
+    def getAll(self):
+        """Get all halo assets
+
+        Returns:
+            list: List of assets OR error
+        """
+        print('Removing this, use search with no parameters instead')
+        request = apiCaller(HALO_API_URL,'search','Asset',{},self.headerJSON)
+        response = request.getData()
+        return response
         
     def update(self,
         id:int=None,
@@ -202,24 +174,24 @@ class assets: # Change this to assets
         fields:list=None,
         **others
                ):
-        """ Adds or updates one or more Assets. If id is included then updates, if not included then creates new."""
+        """Creates or updates one or more assets.  If ID is included, asset(s) will be updated.  If ID is not included new asset(s) will be created.
+
+        Args:
+            id (int, optional): Asset ID.
+            client_id (int, optional): Client ID. 
+            site_id (int, optional): Site ID. 
+            users (list, optional): User IDs. 
+            fields (list, optional): Fields to be updated. 
+
+        Returns:
+            _type_: I dont think it returns anything...
+        """
         
         newVars = locals().copy()
         request = apiCaller(HALO_API_URL,'update','Asset',newVars,self.headerJSON)
         response = request.getData()
         return response
-        # Allow retries in case connection times out (Have not seen this happen until today 11.04.2024)
-
     
-    def updateRaw(self,deviceID,fields,**data):
-        """ Working on it """
-        payload = json.dumps([{ # Device update payload
-        "_dontaddnewfields": True if data['addNewFields'] is None else data['addNewFields'],
-        "isassetdetails": True if data['isAssetDetails'] is None else data['isAssetDetails'],
-        "fields": fields,
-        "id": f"{deviceID}", # Device ID
-        "users": data['User'] if data['User'] is not None else ''}])
-
 
 class clients:
     """Client endpoint
@@ -288,7 +260,7 @@ class ticket():
             'Authorization': 'Bearer ' +  token
             }
     
-    def create(self, payload):
+    def update(self, payload):
         """ Create a ticket 
         Payload must be formatted for now, will create a formatting tool later"""
         request = requests.post(HALO_API_URL+ '/tickets/', headers = self.headerJSON, data=payload)
@@ -341,6 +313,129 @@ class ticket():
             
         return payloads
 
+
+class currency:
+    """ Check currency information
+    
+    Useful to convert pricing from secondary currency to primary currency.
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+        }
+    
+    def getAll(self):
+        """ 
+        Get all active currencies
+        """
+        request = requests.get(HALO_API_URL + '/Currency', headers = self.headerJSON)
+        return _responseParser(request)
+        
+
+class items:
+    """ Products (items) API 
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+        }
+    def getAll(self):
+        pass
+    
+    def getDetails(self, item):
+        """ Get details about an item
+
+        Args:
+            item INT: Item ID
+
+        Returns:
+            Dictionay: Item details
+        """
+        request = requests.get(HALO_API_URL + '/item/' + str(item) + '?includedetails=true', headers = self.headerJSON)
+        return _responseParser(request)
+        
+    def search(self, query):
+        """ Search for an item
+
+        Args:
+            query DICT: Query dictionary
+
+        Returns:
+            Dictionary: Hopefully a list of items?
+        """
+        query = urllib.parse.urlencode(query)
+        request = requests.get(HALO_API_URL+ '/item?' + query, headers = self.headerJSON)
+        return _responseParser(request)
+    
+    def create(self, payload):
+        pass
+    
+    def update(self, payload):
+        """ Update an existing item
+
+        Args:
+            payload DICT: Dictionary containing the fields that need updating
+
+        Returns:
+            Im not sure: Hopefully just a code saying SUCCESS?
+        """
+        payload = json.dumps([payload])
+        
+        postRequest = requests.post(HALO_API_URL+ '/item', headers = self.headerJSON, data = payload)
+        return _responseParser(postRequest)
+
+
+class invoices:
+    """Invoice endpoint(?)
+    """
+    
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+        }
+    
+    def searchRecurring(self, query):
+        """ Search for a recurring invoice
+
+        Args:
+            query DICT: Query dictionary
+
+        Returns:
+            Dictionary: Hopefully a list of recurring invoices
+        """
+        query = urllib.parse.urlencode(query)
+        request = requests.get(HALO_API_URL+ '/recurringinvoice?' + query, headers = self.headerJSON)
+        return _responseParser(request)
+
+
+class Users:
+    """Users enpdpoint.  NOT THE SAME AS CLIENT ENDPOINT!
+
+    """
+    def search():
+        """ Search users"""
+        pass
+    
+    def get():
+        """Get specific user"""
+        pass
+    
+    def update():
+        """Update specific user"""
+        pass
+    
+    def delete():
+        """Delete user"""
+        pass
 
 
 
@@ -407,130 +502,6 @@ def manualTokenUpdate(key,id):
     return attemptUpdate
 
 
-class currency():
-    """ Check currency information
-    
-    Useful to convert pricing from secondary currency to primary currency.
-    """
-    def __init__(self):
-        token = createToken()
-        self.token = token
-        self.headerJSON = { # Header with token
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' +  token
-        }
-    
-    def getAll(self):
-        """ 
-        Get all active currencies
-        """
-        request = requests.get(HALO_API_URL + '/Currency', headers = self.headerJSON)
-        return _responseParser(request)
-        
-
-class items():
-    """ Products (items) API 
-    """
-    def __init__(self):
-        token = createToken()
-        self.token = token
-        self.headerJSON = { # Header with token
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' +  token
-        }
-    def getAll(self):
-        pass
-    
-    def getDetails(self, item):
-        """ Get details about an item
-
-        Args:
-            item INT: Item ID
-
-        Returns:
-            Dictionay: Item details
-        """
-        request = requests.get(HALO_API_URL + '/item/' + str(item) + '?includedetails=true', headers = self.headerJSON)
-        return _responseParser(request)
-        
-    def search(self, query):
-        """ Search for an item
-
-        Args:
-            query DICT: Query dictionary
-
-        Returns:
-            Dictionary: Hopefully a list of items?
-        """
-        query = urllib.parse.urlencode(query)
-        request = requests.get(HALO_API_URL+ '/item?' + query, headers = self.headerJSON)
-        return _responseParser(request)
-    
-    def create(self, payload):
-        pass
-    
-    def update(self, payload):
-        """ Update an existing item
-
-        Args:
-            payload DICT: Dictionary containing the fields that need updating
-
-        Returns:
-            Im not sure: Hopefully just a code saying SUCCESS?
-        """
-        payload = json.dumps([payload])
-        
-        postRequest = requests.post(HALO_API_URL+ '/item', headers = self.headerJSON, data = payload)
-        return _responseParser(postRequest)
-
-
-class invoices():
-    """Invoice endpoint(?)
-    """
-    
-    def __init__(self):
-        token = createToken()
-        self.token = token
-        self.headerJSON = { # Header with token
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' +  token
-        }
-    
-    def searchRecurring(self, query):
-        """ Search for a recurring invoice
-
-        Args:
-            query DICT: Query dictionary
-
-        Returns:
-            Dictionary: Hopefully a list of recurring invoices
-        """
-        query = urllib.parse.urlencode(query)
-        request = requests.get(HALO_API_URL+ '/recurringinvoice?' + query, headers = self.headerJSON)
-        return _responseParser(request)
-
-
-class Users():
-    """Users enpdpoint.  NOT THE SAME AS CLIENT ENDPOINT!
-
-    """
-    def search():
-        """ Search users"""
-        pass
-    
-    def get():
-        """Get specific user"""
-        pass
-    
-    def update():
-        """Update specific user"""
-        pass
-    
-    def delete():
-        """Delete user"""
-        pass
-    
-    
 
 ### OLD SHIT ###
 
@@ -561,41 +532,6 @@ def productUpdate(updateField,originalText,replacementText):
                 attemptUpdate = updateItemByID(item["id"],item[updateField])
                 print(attemptUpdate) # Status of attempted assetUpdate
                 
-
-
-
-class payloadCreator():
-    def PayloadCreator(ticketString,existingTicketID=False,action='alert',**extras): # Sends payload to halo and creates ticket
-        if False:
-            if True:
-                pass
-            elif existingTicketID is not False:
-                payload = json.dumps([{
-                'id': existingTicketID[0],
-                "summary": ticketString,
-                'apply_rules': 'true',
-                "details": f"Previous Summary {existingTicketID[1]}", # HTML formatted info
-                'status_id':'23', # Needs update
-                }])
-            else:
-                payload = json.dumps([{
-                    "tickettype_id": "21" if action == 'alert' else action, # Alert ticket type
-                    "client_id": device['client_id'], # Client ID 
-                    "site_id": device['site_id'], # Site ID
-                    "summary": ticketString, #Ticket Subject
-                    "details_html": f"<p> </p>", # HTML formatted info
-                    "assets": [
-                        {
-                            "id": device['id'],  # Asset
-                        }
-                    ],
-                    "user_id": userID,
-                    "donotapplytemplateintheapi": True, # Is this needed
-                    "form_id": "newticketf3f2abad-8df2-48b4-90ba-39b073c27c84", # Is this needed
-                    "dont_do_rules": True, # Is this needed
-                    }])
-            print(existingTicketID)
-
 
 def productDB():
     #TODO create DB for products to allow for easier searching, updating, etc.
