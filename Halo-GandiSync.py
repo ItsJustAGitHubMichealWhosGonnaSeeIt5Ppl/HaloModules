@@ -1,4 +1,4 @@
-from modules.HaloPSA.HaloV2 import asset
+from modules.HaloPSA.HaloV3 import assets, clients
 import modules.dmeModule as dme
 import modules.gandiModules as gandi
 from datetime import datetime,timezone # TIMEZONE IS USED
@@ -8,7 +8,8 @@ import json
 expiredDomains  = [] # Expired Gandi Domains
 ignoredDomains = [] # Add domains to be ignored by warning
 
-hAssets = asset()
+hAssets = assets()
+hClients = clients()
 dmeData = dme.getAll()['data']
 gandiData = gandi.getAll()
 
@@ -34,20 +35,22 @@ today = datetime.now(timezone.utc)
 # 2024-10-17T12:00:00.000Z
 # Exclude expired domains (puts them in a list for now)
 for domain in gandiData:
-    domainDetails = []
+    
+    domainDetails = [] # List of data to be sent to Halo
     domainExpiration = datetime.fromisoformat(domain['dates']['registry_ends_at'])
     lastUpdated = datetime.fromisoformat(domain['dates']['updated_at'])
-    # Search for asset
-    queryLoad = {
-            'pageinate':'false',
-            'count': 1,
-            'assettype_id': typeID,
-            'search': str(domain['fqdn'])
-        }
-    assetSearch = hAssets.search(queryLoad)
     
-    # Check if domain exists in DME
-    if domainExpiration > today:
+    
+    assetSearch = hAssets.search( # Check if domain is already in Halo (asset search)
+            pageinate=False,
+            assettype_id=typeID,
+            search=str(domain['fqdn']))
+    
+    clientSearch = hClients.search(
+        search=domain['tags'][0]
+    )
+    
+    if domainExpiration > today: # Check if domain exists in DME
         if domain['fqdn'] in dmeDomains.keys():
             managed = '1'
             dmeID = dmeDomains[domain['fqdn']]['id']
@@ -66,24 +69,16 @@ for domain in gandiData:
         
 
         
-        if assetSearch['record_count'] == 0:
-            payload = json.dumps([{ # Device update payload
-            "_dontaddnewfields": True,
-            "isassetdetails": True,
-            'assettype_id': typeID,
-            "fields": domainDetails,
-            }])
-        else:
-            assetID = assetSearch['assets'][0]['id']
-            payload = json.dumps([{ # Device update payload
-            "_dontaddnewfields": True,
-            "isassetdetails": True,
-            'assettype_id': typeID,
-            "fields": domainDetails,
-            'id': assetID
-            }])
+        hAssets.update(
+        _dontaddnewfields= True,
+        isassetdetails= True,
+        assettype_id= typeID,
+        fields=domainDetails,
+        id= assetSearch['assets'][0]['id'] if assetSearch['record_count'] != 0 else None,
+        client_id=clientSearch['clients'][0]['id'],
+        inventory_number=domain['fqdn']
+        )
         
-        hAssets.update(payload)
 
 
     else:
