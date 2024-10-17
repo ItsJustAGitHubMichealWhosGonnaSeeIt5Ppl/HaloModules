@@ -108,9 +108,8 @@ for domain in gandiData:
     client_id = clientID,
     site_id = siteID,
     inventory_number = domain['fqdn'],
-    status_id = 1 if domainExpiration > today else 2
+    status_id = 1 if domainExpiration > today else 4
     )
     print(domain['fqdn']+ ' has been created/updated')
-
 
 
