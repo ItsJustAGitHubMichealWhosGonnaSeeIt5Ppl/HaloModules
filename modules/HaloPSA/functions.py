@@ -31,7 +31,11 @@ class apiCaller:
             self.url += '?' + query
             self._requester('get')
         elif function.lower() == 'get':
-            self.get()
+            eyeD = str(self.formattedData['id']) # get ID
+            self.formattedData.pop('id') # Remove ID from query.
+            query = urllib.parse.urlencode(self.formattedData)
+            self.url += '/' + eyeD + '?' + query
+            self._requester('get')
         elif function.lower() == 'update':
             
             self.payload = json.dumps([self.formattedData],indent=4)
@@ -85,37 +89,15 @@ class apiCaller:
                 print('The specified \'client_secret\' is invalid')
             else:
                 print(content["error_description"])
+        elif code in [400]:
+            print(f'{code} - Bad Request')
+            raise Exception( f'{code} - Bad Request')
                 
         # Add unique failures as found
         
         # If secret, client ID, or URL are wrong, error 401 is returned
         else:
             raise Exception( f'{code} - Other failure')
-    
-    def search(self):
-        validEndpoints = self.allEndpoints
-         # Add questionmark to url
-        
-        paramsToAdd = self.params | self.params['others'] # Copy params and add any additional items
-        paramsToAdd.pop('others') # Remove 'others' dict item to avoid confusion
-        
-        queryDict = {} # Formated query paramers saved here
-        
-        pageinateToggle = False
-        for item, value in paramsToAdd.items(): # Check params, add anything that isn't blank to the query
-
-            if item == 'pageinate' and value == True:
-                pageinateToggle = True
-
-            if pageinateToggle == False and item in ['page_size','page_no']: # Skip redundant values
-                continue
-            
-            if value !=None:
-                queryDict.update({item : value})
-        
-        query = urllib.parse.urlencode(queryDict)
-        self.url += '?' + query
-        self._requester('get')
         
         
         pass

@@ -41,11 +41,12 @@ def createToken():
     }
     
     request = requests.post(HALO_AUTH_URL, headers=authheader, data=urllib.parse.urlencode(payload)) # Request auth token
-    response = request.reason, request.content
-    if response[0] == 'OK':
-        return response[1]['access_token']
+    responseR = request.reason
+    if responseR == 'OK':
+        content = json.loads(request.content)
+        return content['access_token']
     else:
-        return response
+        return print('Error')
 
 mainToken = createToken() # Remove this
 
@@ -81,6 +82,7 @@ class assets: # Change this to assets
             id:int,
             includedetails:bool=False,
             includediagramdetails:bool=False,
+            **others
             ):
         """
         Get a single asset's details.
@@ -149,12 +151,10 @@ class assets: # Change this to assets
         """
         
         newVars = locals().copy()
-        
         request = apiCaller(HALO_API_URL,'search','Asset',newVars,self.headerJSON)
         response = request.getData()
         return response
     
-    @search
     def getAll(self):
         """Get all halo assets
 
@@ -242,8 +242,30 @@ class clients:
         response = request.getData()
         return response
         
-    def get():
-        pass
+    def get(self,
+            id:int,
+            includedetails:bool=False,
+            includediagramdetails:bool=False,
+            **others
+            ):
+        """
+        Get a single client's details.
+        Supports all Halo parameters, even if not listed.  
+        Requires atleast ID to be provided
+        Args:
+            id (int): Client ID
+            includedetails (bool, optional): Whether to include extra details (objects) in the response. Defaults to False.
+            includediagramdetails (bool, optional): Whether to include diagram details in the response. Defaults to False.
+
+        Returns:
+            dict: Single client details
+        """
+        
+        newVars = locals().copy()
+        request = apiCaller(HALO_API_URL,'get','Client',newVars,self.headerJSON)
+        response = request.getData()
+        return response
+        
     def update():
         """Update one or more clients"""
         pass
@@ -264,14 +286,14 @@ class ticket():
         """ Create a ticket 
         Payload must be formatted for now, will create a formatting tool later"""
         request = requests.post(HALO_API_URL+ '/tickets/', headers = self.headerJSON, data=payload)
-        return _responseParser(request)
+        #return _responseParser(request)
 
     def search(self,query):
         """ Search ticket using Query (Later query will be its own thing so its easier to use) """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/tickets?' + query, headers = self.headerJSON)
 
-        return _responseParser(request)
+        #return _responseParser(request)
     
     def merge(self,existingID,newID):
         """Merge two tickets
@@ -332,7 +354,7 @@ class currency:
         Get all active currencies
         """
         request = requests.get(HALO_API_URL + '/Currency', headers = self.headerJSON)
-        return _responseParser(request)
+        #return _responseParser(request)
         
 
 class items:
@@ -358,7 +380,7 @@ class items:
             Dictionay: Item details
         """
         request = requests.get(HALO_API_URL + '/item/' + str(item) + '?includedetails=true', headers = self.headerJSON)
-        return _responseParser(request)
+        #return _responseParser(request)
         
     def search(self, query):
         """ Search for an item
@@ -371,7 +393,7 @@ class items:
         """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/item?' + query, headers = self.headerJSON)
-        return _responseParser(request)
+        #return _responseParser(request)
     
     def create(self, payload):
         pass
@@ -388,7 +410,7 @@ class items:
         payload = json.dumps([payload])
         
         postRequest = requests.post(HALO_API_URL+ '/item', headers = self.headerJSON, data = payload)
-        return _responseParser(postRequest)
+        #return _responseParser(postRequest)
 
 
 class invoices:
@@ -414,9 +436,68 @@ class invoices:
         """
         query = urllib.parse.urlencode(query)
         request = requests.get(HALO_API_URL+ '/recurringinvoice?' + query, headers = self.headerJSON)
-        return _responseParser(request)
+        #return _responseParser(request)
 
 
+class sites:
+    """Sites endpoint
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+            }
+        self.url = HALO_API_URL + '/Client'    
+    def search(self,
+        pageinate:bool=False,
+        page_size:int=50,
+        page_no:int=1,
+        order:str =None,
+        orderdesc:bool=None,
+        search:str=None,
+        toplevel_id:int=None,
+        client_id:int=None,
+        includeinactive:bool=None,
+        includeactive:bool=None,
+        count:int=None,
+        **others
+               ):
+        """Search Sites.  Supports unlisted parameters 
+
+        Args:
+            paginate (bool, optional): Whether to use Pagination in the response. Defaults to False.
+            page_size (int, optional): When using Pagination, the size of the page. Defaults to 50.
+            page_no (int, optional): When using Pagination, the page number to return. Defaults to 1.
+            order (str, optional): The name of the field to order by.
+            orderdesc (bool, optional): Whether to order ascending or descending. Defaults to decending sort.
+            search (str, optional): Filter by Sites like your search.
+            toplevel_id (int, optional): Filter by Sites belonging to a particular top level.
+            client_id (int, optional): Filter by Sites belonging to a particular customer.
+            includeinactive (bool, optional): Include inactive Sites in the response. Defaults to False/No.
+            includeactive (bool, optional): Include active Sites in the response. Defaults to True/Yes.
+            count (int, optional): When not using pagination, the number of results to return.
+        
+        Returns:
+            dict: Search results.
+        """
+        newVars = locals().copy()
+        
+        request = apiCaller(HALO_API_URL,'search','Site',newVars,self.headerJSON)
+        response = request.getData()
+        return response
+        
+    def get():
+        pass
+    def update():
+        """Update one or more sites"""
+        pass
+    def delete():
+        pass
+    
+    
+    
 class Users:
     """Users enpdpoint.  NOT THE SAME AS CLIENT ENDPOINT!
 
