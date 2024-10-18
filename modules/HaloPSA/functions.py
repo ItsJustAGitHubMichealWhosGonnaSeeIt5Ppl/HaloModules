@@ -8,7 +8,7 @@ class apiCaller:
     """All available functions, endpoint independant"""
     
     def __init__(self, baseURL, function, endpoint, params, header,*payload):
-        self.allEndpoints = ['Action','Agent','Appointment','Asset','Attachment','Client','ClientContract','Invoice','Item','KBArticle','Opportunities','Projects','Quotation','Report','Site','Status','Supplier','Team','TicketType','Tickets','Users'] # Endpoints function can be used with
+        self.allEndpoints = ['Action','Agent','Appointment','Asset','Attachment','Client','ClientContract','Invoice','Item','KBArticle','Opportunities','Projects','Quotation','Report','Site','Status','Supplier','Team','TicketType','Tickets','Users','RecurringInvoice','RecurringInvoice/UpdateLines'] # Endpoints function can be used with
         
         if function.lower() not in ['search','get','update','delete','me']:
             raise Exception('Invalid function')
@@ -30,16 +30,18 @@ class apiCaller:
             query = urllib.parse.urlencode(self.formattedData)
             self.url += '?' + query
             self._requester('get')
+            
         elif function.lower() == 'get':
             eyeD = str(self.formattedData['id']) # get ID
             self.formattedData.pop('id') # Remove ID from query.
             query = urllib.parse.urlencode(self.formattedData)
             self.url += '/' + eyeD + '?' + query
             self._requester('get')
-        elif function.lower() == 'update':
             
+        elif function.lower() == 'update':
             self.payload = json.dumps([self.formattedData],indent=4)
             self._requester('post')
+            
         elif function.lower() == 'delete':
             self.delete()
 
@@ -124,3 +126,4 @@ def testFunc(test='word',b=2,**other):
 
 if __name__=="__main__":
     testFunc(data=2,otherData=3)
+

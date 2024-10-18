@@ -53,7 +53,7 @@ mainToken = createToken() # Remove this
 
 #### Classes
 
-class actions():
+class actions:
     def search():
         pass
     def get():
@@ -273,7 +273,7 @@ class clients:
         pass
 
 
-class ticket():
+class ticket:
     def __init__(self):
         token = createToken()
         self.token = token
@@ -439,6 +439,68 @@ class invoices:
         #return _responseParser(request)
 
 
+class recurringInvoices:
+    """Recurring Invoice endpoint
+    """
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+            }
+        self.url = HALO_API_URL + '/RecurringInvoice'
+    
+    def search(self,
+        pageinate:bool=False,
+        page_size:int=None,
+        page_no:int=None,
+        order:str =None,
+        orderdesc:bool=None,
+        search:str=None,
+        count:int=None,
+        client_id:int=None,
+        includelines:bool=None,
+        **others):
+        
+        
+        
+        newVars = locals().copy()
+        request = apiCaller(HALO_API_URL,'search','RecurringInvoice',newVars,self.headerJSON)
+        response = request.getData()
+        return response
+        
+        
+        pass
+    def get():
+        pass
+    def update():
+        pass
+    
+    def updateLines(self,
+        id:int,
+        ihid:int,
+        **others):
+        """Update recurring invoice lineitem(s)
+
+        Args:
+            id (int): Recurring invoice line item ID (required)
+            ihid (int): Recurring invoice ID (required)
+
+        Returns:
+            _type_: _description_
+        """
+        
+        
+        newVars = locals().copy()
+        request = apiCaller(HALO_API_URL,'update','RecurringInvoice/UpdateLines',newVars,self.headerJSON)
+        response = request.getData()
+        return response
+    def delete():
+        pass
+    
+
+    
 class sites:
     """Sites endpoint
     """
