@@ -119,7 +119,7 @@ for domain in gandiData:
     queueMode='queue'
     )
     print(domain['fqdn']+ ' has been queued for update')
-    hAssets.update(queueMode='update')
+
 hAssets.update(queueMode='update')
 print('assets have been updated')
 

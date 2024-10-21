@@ -5,6 +5,8 @@ import modules.gandiModules as gandi
 from datetime import datetime,timezone # TIMEZONE IS USED
 
 
+#TODO alert if a domain does not have a valid invoice.
+#TODO Add field in asset to exclude a domain from invoicing, with a reason
 # Domain line item IDs
 lineItemIDs = {
     'uk': 172,
@@ -26,7 +28,7 @@ allDomainAssets = hAssets.search(order='client_name',assettype_id=137) # Get all
 
 currentClientID = 0
 clientDomains = {}
-for domain in allDomainAssets['assets']:
+for domain in allDomainAssets['assets']: # Format data 
     customDomain = False
     
     if domain['status_id'] != 1: # Skip expired/inactive domains
@@ -53,9 +55,14 @@ for domain in allDomainAssets['assets']:
 print('test.')
 debug = True
 for client,domains in clientDomains.items():
-
+    typesToBeInvoiced = list(domains.keys())
+    typesInvoiced = [] # Domain types invoiced.
     invoices = hRecurring.search(client_id=client,includelines=True) # Get client invoices
-    
+    if invoices['record_count'] == 0:
+        print(f'no invoices on record for client ID: {client}')
+        input('press any key to continue')
+        continue
+        
     for invoice in invoices['invoices']:
         if invoice['disabled'] == True: # Skip disabled invoices
             continue
@@ -63,17 +70,26 @@ for client,domains in clientDomains.items():
             for item in invoice['lines']:
                 domainString = ''
                 if str(item['_itemid']) in domains.keys(): # Check if item is a domain item
+                    typesInvoiced += [str(item['_itemid'])]
+                    
+                    if len(domains[str(item['_itemid'])]) != item['qty_order']:
+                        print(f'[{invoice['client_name']}]: Invoice {invoice['id']} quantity for {item['nominal_code']} is wrong. Should be {len(domains[str(item['_itemid'])])}, currently {item['qty_order']}')
+                        input('press any key to continue')
                     for domain in domains[str(item['_itemid'])]:
                         domainString += '\n' + domain['key_field']
                     
                     newDesc = item['item_longdescription'].split('\n')[0] +  domainString
-                    
-                    print(newDesc)
-                    
-                    if debug == False:
+            
+                    if debug == False: # send request
                         hRecurring.updateLines(
                             customFields=[],
                             id=item['id'],
                             ihid=item['ihid'],
                             item_longdescription=newDesc)
-                    
+                    else:
+                        print(f'=============\nDebug enabled, old description was:\n{item['item_longdescription']}\nNew line item would have been: \n{newDesc}')
+    remainingIDs = list(set(typesToBeInvoiced) -  set(typesInvoiced)) # Should be zero
+    if len(remainingIDs) != 0:
+        print(f'{invoices['invoices'][0]['client_name']} is missing lineitem(s) for {remainingIDs}')
+        input('press any key to continue')
+
