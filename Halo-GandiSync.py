@@ -1,4 +1,4 @@
-from modules.HaloPSA.HaloV3 import assets, sites, clients, recurringInvoices
+from HaloPSA.Halo import assets, sites, clients, recurringInvoices
 import modules.dmeModule as dme
 import modules.gandiModules as gandi
 from datetime import datetime,timezone # TIMEZONE IS USED
