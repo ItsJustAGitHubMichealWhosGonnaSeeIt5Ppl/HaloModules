@@ -37,29 +37,33 @@ today = datetime.now(timezone.utc)
 
 # 2024-10-17T12:00:00.000Z
 # Exclude expired domains (puts them in a list for now)
+
+domainAssets = hAssets.search(
+    pageinate=False,
+    assettype_id=typeID,
+)
 for domain in gandiData:
     
     domainDetails = [] # List of data to be sent to Halo
     domainExpiration = datetime.fromisoformat(domain['dates']['registry_ends_at'])
     gandiLastUpdated = datetime.fromisoformat(domain['dates']['updated_at'])
     
-    #TODO if asset already has active site/client, don't update.
-    assetSearch = hAssets.search( # Check if domain is already in Halo (asset search)
-        pageinate=False,
-        assettype_id=typeID,
-        search=str(domain['fqdn'])
-        )
+    for haloDetails in domainAssets['assets']:
+        noMatch = True
+        if haloDetails['inventory_number'] == domain['fqdn']:
+            noMatch = False
+            assetDetails = haloDetails
     forceUpdate = False
-    if assetSearch['record_count'] == 1 and assetSearch['assets'][0]['key_field3'] != '': # Check that asset exists and that the last updated field is not empty
-        haloLastUpdated = datetime.strptime(str(assetSearch['assets'][0]['key_field3']+ ' +0100'), '%d/%m/%Y %H:%M:%S %z') # Jank solution to get a timezone added, needs work. 
+    if noMatch == False and assetDetails['key_field3'] != '': # Check that asset exists and that the last updated field is not empty
+        haloLastUpdated = datetime.strptime(str(assetDetails['key_field3']+ ' +0100'), '%d/%m/%Y %H:%M:%S %z') # Jank solution to get a timezone added, needs work. 
         if gandiLastUpdated < haloLastUpdated and forceUpdate == False:
             print(f'no changes to {domain['fqdn']} have been made since last check, skipping')
             continue
         
     
-    if assetSearch['record_count'] == 1 and assetSearch['assets'][0]['client_id'] != 1: # If asset already has client/site info skip.
-        clientID = assetSearch['assets'][0]['client_id']
-        siteID = assetSearch['assets'][0]['site_id']
+    if noMatch == False and assetDetails['client_id'] != 1: # If asset already has client/site info skip.
+        clientID = assetDetails['client_id']
+        siteID = assetDetails['site_id']
     
     else:
         clientSearch = hClients.search(
@@ -103,11 +107,12 @@ for domain in gandiData:
     isassetdetails = True,
     assettype_id = typeID,
     fields = domainDetails,
-    id = assetSearch['assets'][0]['id'] if assetSearch['record_count'] != 0 else None,
+    id = assetDetails['id'] if noMatch ==False else None,
     client_id = clientID,
     site_id = siteID,
     inventory_number = domain['fqdn'],
-    status_id = 1 if domainExpiration > today else 4
+    status_id = 1 if domainExpiration > today else 4,
+    queueMode='queue'
     )
     print(domain['fqdn']+ ' has been created/updated')
 
