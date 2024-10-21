@@ -2,8 +2,7 @@ from modules.HaloPSA.HaloV3 import assets, sites, clients, recurringInvoices
 import modules.dmeModule as dme
 import modules.gandiModules as gandi
 from datetime import datetime,timezone # TIMEZONE IS USED
-
-
+import json
 
 
 expiredDomains  = [] # Expired Gandi Domains
@@ -14,6 +13,7 @@ hSites = sites()
 hClients = clients()
 dmeData = dme.getAll()['data']
 gandiData = gandi.getAll()
+
 
 # Field IDs
 typeID = 137 # Asset types ID
@@ -42,18 +42,22 @@ domainAssets = hAssets.search(
     pageinate=False,
     assettype_id=typeID,
 )
+count = 0
 for domain in gandiData:
     
     domainDetails = [] # List of data to be sent to Halo
     domainExpiration = datetime.fromisoformat(domain['dates']['registry_ends_at'])
     gandiLastUpdated = datetime.fromisoformat(domain['dates']['updated_at'])
     
+    noMatch = True
     for haloDetails in domainAssets['assets']:
-        noMatch = True
         if haloDetails['inventory_number'] == domain['fqdn']:
             noMatch = False
             assetDetails = haloDetails
-    forceUpdate = False
+            break
+            
+            
+    forceUpdate = True
     if noMatch == False and assetDetails['key_field3'] != '': # Check that asset exists and that the last updated field is not empty
         haloLastUpdated = datetime.strptime(str(assetDetails['key_field3']+ ' +0100'), '%d/%m/%Y %H:%M:%S %z') # Jank solution to get a timezone added, needs work. 
         if gandiLastUpdated < haloLastUpdated and forceUpdate == False:
@@ -105,20 +109,19 @@ for domain in gandiData:
     hAssets.update(
     _dontaddnewfields = True,
     isassetdetails = True,
+    id = assetDetails['id'] if noMatch == False else None,
     assettype_id = typeID,
     fields = domainDetails,
-    id = assetDetails['id'] if noMatch ==False else None,
     client_id = clientID,
     site_id = siteID,
     inventory_number = domain['fqdn'],
     status_id = 1 if domainExpiration > today else 4,
     queueMode='queue'
     )
-    print(domain['fqdn']+ ' has been created/updated')
+    print(domain['fqdn']+ ' has been queued for update')
+    hAssets.update(queueMode='update')
+hAssets.update(queueMode='update')
+print('assets have been updated')
 
 
-# Invoice updater
-hRecurring = recurringInvoices()
-
-allRecurring = hRecurring.search()
 input()
