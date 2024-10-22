@@ -16,7 +16,13 @@ import requests
 def toUnixInt(input,mode='date'): 
 # Converts ISO date or date and time into a UNIX timecode. Work with string formatted ISO dates.
 # TODO #25 Use this converter for all dates that need to be ISO, add ability to convert back as well.
-    return int(str(datetime.fromisoformat(str(input)).timestamp())[:10])
+    try:
+        date = int(str(datetime.fromisoformat(str(input)).timestamp())[:10])
+        return date
+    except:
+        print('Failed to convert ' + str(input))
+        return None
+     
 
 
 def daysSince(day,value='day'):
@@ -72,3 +78,28 @@ def requestSend(rType,data):
         gentleError('Connection error')
     else:
         return request
+    
+def userInput(text:str,validInputs:list,timeout:int=None):
+    """collect and validate user input
+
+    Args:
+        text (str): Text to be displayed when requesting input 
+        validInputs (list): Valid inputs list (must be lowercase)
+        timeout (int): maximum tries before giving up
+
+    Returns:
+        (any): validated input or False if no valid input could be collected
+    """
+    count = 0
+    while True:
+        if timeout !=None and timeout < count:
+            return False
+        else:
+            userInput = input(f'{text}: ')
+        
+        if str(userInput).lower() in validInputs:
+            return userInput
+        else:
+            count+=1
+            print('Invalid choice')
+        

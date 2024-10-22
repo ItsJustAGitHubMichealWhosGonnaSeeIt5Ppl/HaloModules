@@ -59,6 +59,8 @@ def msoftVerHistoryScraper(link):
                 sqlValues = (x['td'][2],toUnixInt(x['td'][1]),toUnixInt(date.today()))
                 queryDB(sqlQuery,sqlValues)
 
+                
+
 def msoftVersions():
     # Windows 10 and 11 have different URLs, but only 11 actually says its 11... 
     winVers = {
@@ -106,7 +108,6 @@ def winCheck(osVerRaw):
             return 1
     return osStatusCheck(), osString
     
-        
 
 
 
