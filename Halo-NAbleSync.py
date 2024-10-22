@@ -3,17 +3,17 @@ from datetime import datetime, date
 import json
 
 # Local modules
-import modules.HaloPSA.HaloV2 as Halo
-from modules.miscModules import daysSince, valueExtract, customFieldCheck
+import modules.HaloPSA.HaloV3 as Halo
+from modules.miscModules import daysSince, valueExtract, customFieldCheck, userInput
 from modules.msoftModules import winCheck
 from modules.nAbleModules import getN_AbleInfo
 from modules.macModules import macCheck
 
 
-version = '0.0.1a'
+version = '0.0.2'
 #
 
-#TODO Before making public, status IDs must be switched
+#TODO Before making public, status IDs must be switched or it will be useless.
 
 settings = {
     'osChecking': False, # Enable checking of OS version
@@ -33,12 +33,11 @@ settingsTextFriendly = {
 print(f'Halo-NAble Asset Sync script tool Version: {version}')
 print('Settings\n')
 for setting, text in settingsTextFriendly.items():
-    needValidInput = True
-    while needValidInput == True:
-        userInput = input(text + ' Y/N: ')
-        if userInput.capitalize() in ['Y','N']:
-            needValidInput = False
-    settings[setting] = False if userInput.capitalize() == 'N' else True
+    validatedInput = userInput(text,['y','n'])
+    if validatedInput == False:
+        raise Exception('No valid input provided')
+    else:
+        settings[setting] = False if validatedInput.lower() == 'n' else True
 
 # // Code
 # Global Variables used to check how long a device has been online (day only)
@@ -58,10 +57,10 @@ def debugText(string,warnLevel):
 
 # Halo.invoiceActivator()
 # Create Halo Variables
-hAssets = Halo.asset()
-hTickets = Halo.ticket()
-assetList = hAssets.getAll()
-
+hAssets = Halo.assets()
+assetList = hAssets.search()
+hRecurrInv = Halo.recurringInvoices()
+hUsers = Halo.users()
 
 for device in assetList['assets']:
 
@@ -75,7 +74,7 @@ for device in assetList['assets']:
 
     # Get additional asset information from Halo
     debugText(f'Getting device details from Halo','INFO')
-    haloDetailExpanded  = hAssets.get(device['id'])
+    haloDetailExpanded  = hAssets.get(id=device['id'],includedetails=True)
     haloFieldNames = ['id','value']    
 
     
@@ -243,6 +242,7 @@ for device in assetList['assets']:
     
     debugText('Trying to match asset to user',f'INFO-{device['id']}') 
     userItem = None
+    
     if  len(haloDetailExpanded['users']) != 0: # Asset already has a user
         userID = haloDetailExpanded['users'][0]['id']
         debugText(f'Asset already matched to user ID: {userID}',f'INFO-{device['id']}')
@@ -256,49 +256,65 @@ for device in assetList['assets']:
         'deviceUser':nAbleDetails['username'],
         }
         for term in queries.values():
-            queryLoad = {
-                'pageinate':'false',
-                "client_id": device['client_id'], # Client ID 
-                # "site_id": device['site_id'], # Site ID
-                'count': 3,
-                'search':term
-            }
-            user = Halo.userSearch(queryLoad)
-            if user['record_count'] > 0:
-                userID = user['users'][0]['id']
+            users = hUsers.search(
+                pageinate = False,
+                client_id = device['client_id'], # Client ID 
+                count = 3,
+                search = term,
+            )
+            if users['record_count'] == 0:
+                debugText('No matching user found',f'WARN-{device['id']}')
+                continue
+            elif users['record_count'] == 1:
+                userID = users['users'][0]['id']
                 userItem = [{'id':userID}]
                 debugText(f'Found user, ID: {userID}',f'INFO-{device['id']}')
                 break
-            else:
-                debugText('No matching user found',f'WARN-{device['id']}')
+            elif users['record_count'] > 1:
+                debugText(f'Multiple matches found for search {term}, please choose correct input',f'WARN-{device['id']}')
+                text = f'{haloDetailExpanded['client_name']} has multiple matches for {term}.  PC name is {haloDetailExpanded['key_field']}' 
+                count = 1
+                validChoices = []
+                for user in users['users']: # Allows user to pick a 
+                    text += f'\n {count}: {user['name']} from site {user['site_name']}'
+                    validChoices +=[str(count)] 
+                    count +=1
+                text += f'\n {count}: None of the above\n'
+                validChoices +=[str(count)]
+                validatedInput = userInput(text, validChoices, 5)
+                if validatedInput == False or int(validatedInput) == count:
+                    debugText(f'No user chosen',f'INFO-{device['id']}')
+                    continue
+                else:
+                    userID = users['users'][int(validatedInput)-1]['id'] # Our count starts at 1, but list count starts a 0
+                    userItem = [{'id':userID}]
+                debugText(f'Found user, ID: {userID}',f'INFO-{device['id']}')
+                break
     
     
     
     # Send information to Halo 
     debugText('Attempting to update asset',f'INFO-{device['id']}')
-    payload = json.dumps([{ # Device update payload
-        "_dontaddnewfields": True,
-        "isassetdetails": True,
-        "fields": baseList + optionalList,
-        "id": f"{device['id']}", # Device ID
-        "users": userItem if userItem != None else ''}])
+    
         # Attempt to update device if debug mode disabled
     if settings['debugOnly'] == False:
-        hAssets.update(payload)
         debugText(f'{device['id']} updated successfully',f'INFO-{device['id']}')
+        hAssets.update( # Device update payload
+            _dontaddnewfields= True,
+            isassetdetails=True,
+            fields= baseList + optionalList,
+            id=device['id'], # Device ID
+            users= userItem if userItem != None else None)
     elif settings['debugOnly'] == True:
         debugText('Debug mode enabled, asset not upated',f'INFO-{device['id']}')
 
     
     if activeChecks == '1':
-        hInvoices = Halo.invoices()
         
+        invoices = hRecurrInv.search(
+            pageinate= False,
+            client_id= device['client_id'])
         
-        queryLoad = {
-            'pageinate':'false',
-            "client_id": device['client_id'], # Client ID 
-            }
-        invoices = hInvoices.searchRecurring(queryLoad)
         if len(invoices['invoices']) > 0:
             print('client has an invoice')
         else:
