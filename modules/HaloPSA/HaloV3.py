@@ -99,7 +99,7 @@ class assets: # Change this to assets
         """
 
         newVars = locals().copy()
-        request = apiCaller(HALO_API_URL,'search','Asset',newVars,self.headerJSON)
+        request = apiCaller(HALO_API_URL,'get','Asset',newVars,self.headerJSON)
         response = request.getData()
         return response
     
@@ -578,40 +578,103 @@ class sites:
     
     
     
-class Users:
-    """Users enpdpoint.  NOT THE SAME AS CLIENT ENDPOINT!
-
+class users:
+    """Users endpoint.  
     """
-    def search():
-        """ Search users"""
-        pass
+    def __init__(self):
+        token = createToken()
+        self.token = token
+        self.headerJSON = { # Header with token
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' +  token
+            }
+        self.url = HALO_API_URL + '/Users'
+    """Clients endpoint"""
     
-    def get():
-        """Get specific user"""
-        pass
+    def search(self,
+        pageinate:bool=False,
+        page_size:int=50,
+        page_no:int=1,
+        order:str =None,
+        orderdesc:bool=None,
+        search:str=None,
+        search_phonenumbers:bool=None,
+        toplevel_id:int=None,
+        client_id:int=None,
+        site_id:int=None,
+        organisation_id:int=None,
+        department_id:int=None,
+        asset_id:int=None,
+        includeinactive:bool=None,
+        includeactive:bool=None,
+        approversonly:bool=None,
+        excludeagents:bool=None,
+        count:int=None,
+        **others
+               ):
+        """_summary_
+
+        Args:
+            paginate (bool, optional): Whether to use Pagination in the response. Defaults to False.
+            page_size (int, optional): When using Pagination, the size of the page. Defaults to 50.
+            page_no (int, optional): When using Pagination, the page number to return. Defaults to 1.
+            order (str, optional): The name of the field to order by.
+            orderdesc (bool, optional): Whether to order ascending or descending. Defaults to decending sort.
+            search (str, optional): Query to filter by.
+            search_phonenumbers (bool, optional): Filter by Users with a phone number like your search. Defaults to None.
+            toplevel_id (int, optional): Filter by Users belonging to a particular top level.            
+            client_id (int, optional): Filter by Users belonging to a particular customer.
+            site_id (int, optional): Filter by Users belonging to a particular site.
+            organisation_id (int, optional): Filter by Users belonging to a particular site.
+            department_id (int, optional): Filter by Users belonging to a particular department.
+            asset_id (int, optional): Filter by Users assigned to a particular asset.
+            includeinactive (bool, optional): Include inactive Users in response. Defaults to False.
+            includeactive (bool, optional): Include inactive Users in response. Defaults to True.
+            approversonly (bool, optional): Include only Users that can approve appoval processes response. Defaults to False.
+            excludeagents (bool, optional): Excluse Users that are linked to active agent accounts. Defaults to False.
+            count (int, optional): When not using pagination, the number of results to return.
+
+        Returns:
+            dict: Search results
+        """
     
+        newVars = locals().copy()
+        
+        request = apiCaller(HALO_API_URL,'search','Users',newVars,self.headerJSON)
+        response = request.getData()
+        return response
+        
+    def get(self,
+            id:int,
+            includedetails:bool=None,
+            includeactivity:bool=None,
+            includepopups:bool=None,
+            **others
+            ):
+        """
+        Get a single user's details.
+        Supports all Halo parameters, even if not listed.  
+        Requires atleast ID to be provided
+        Args:
+            id (int): User ID
+            includedetails (bool, optional): Whether to include extra details in the response. Defaults to False.
+            includeactivity (bool, optional): Whether to include User's ticket activity in the response. Defaults to False.
+            includepopups (bool, optional): Whether to include customer pop ups in the response. Defaults to False.
+
+        Returns:
+            dict: Single users details
+        """
+        
+        newVars = locals().copy()
+        request = apiCaller(HALO_API_URL,'get','User',newVars,self.headerJSON)
+        response = request.getData()
+        return response
+        
     def update():
-        """Update specific user"""
+        """Update one or more users"""
         pass
-    
     def delete():
-        """Delete user"""
         pass
-
-
-
-
-def userSearch(query):
-    """ Searches for a user """
-    headers = { # Header with token
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + mainToken
-        }
-    request = requests.get(HALO_API_URL+ '/users?' + urllib.parse.urlencode(query), headers = headers)
-    if request.status_code != 200:
-        return 'Failed to get users'
-    response = json.loads(request.content)
-    return response
 
 
 def invoiceActivator(ids=None):
