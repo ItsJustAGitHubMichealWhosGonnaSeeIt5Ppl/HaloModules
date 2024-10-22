@@ -41,9 +41,6 @@ def getDetails(domain):
     load = requester(url)
     return load[0]
 
-
-
-
     
 def requester(url,header='Default'):
     if header == 'Default':
@@ -53,9 +50,13 @@ def requester(url,header='Default'):
     }
 
     try:
-    
         response = rq.get(url, headers=header)
-        # Format and return
-        return json.loads(response.content.decode('utf-8')), response.headers, response.links
+
+        
     except Exception as e:
         raise e
+    # Format and return
+    if response.status_code == 403:
+        raise Exception('403: Forbidden')
+    else:
+        return json.loads(response.content.decode('utf-8')), response.headers, response.links
