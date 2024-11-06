@@ -12,6 +12,9 @@
 **.pyc
 **.DS_Store
 **dattoModules.py
+**coveModule.py
 /integratedPackages
 /googleDriveCheck.py
 /archive
+**temp.zip
+**testAPITool.py

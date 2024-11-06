@@ -14,6 +14,7 @@ version = '0.0.2'
 #
 
 #TODO Before making public, status IDs must be switched or it will be useless.
+#TODO Add exception if checks are for EDR
 
 settings = {
     'osChecking': False, # Enable checking of OS version
@@ -319,7 +320,7 @@ for device in assetList['assets']:
             print('client has an invoice')
         else:
             print(f'No invoice for {device['client_id']}')
-            input()
+            #input()
     else:
         print('no checks')
         

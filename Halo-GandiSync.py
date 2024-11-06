@@ -12,6 +12,7 @@ hAssets = assets()
 hSites = sites()
 hClients = clients()
 dmeData = dme.getAll()['data']
+token = gandi.checkToken() # text token
 gandiData = gandi.getAll()
 
 
@@ -70,9 +71,11 @@ for domain in gandiData:
         siteID = assetDetails['site_id']
     
     else:
+
         clientSearch = hClients.search(
             search=domain['tags'][0],
-            )
+        )
+
         
         if clientSearch['record_count'] != 0: # get details of client (gets main site)
             clientID = clientSearch['clients'][0]['id']

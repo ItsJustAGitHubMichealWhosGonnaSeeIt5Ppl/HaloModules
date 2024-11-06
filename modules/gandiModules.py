@@ -20,7 +20,10 @@ headers = { # Header with token
 
 def checkToken():
     response = rq.get(AUTH_INFO_URL,headers=headers)
-    return json.loads(response.content.decode('utf-8'))
+    if response.status_code == 401:
+        raise Exception('Token expired or invalid')
+    else:
+        return json.loads(response.content.decode('utf-8'))
 
 def getAll():
     incomplete = True
