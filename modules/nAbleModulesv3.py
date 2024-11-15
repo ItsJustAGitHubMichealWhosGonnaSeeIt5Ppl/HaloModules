@@ -209,10 +209,6 @@ class nAble:
     
 if __name__ == '__main__':
     naybl = nAble('uk',NABLE_KEY)
-    if False: # Testing checks
-
-    
-    ### Check all devices for ?
     
     clients = naybl.clients()
     
