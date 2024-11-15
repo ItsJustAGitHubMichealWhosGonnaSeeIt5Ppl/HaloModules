@@ -1,18 +1,16 @@
 # // Imports
 from datetime import datetime, date
 import json
+import os
 
 # Local modules
 import modules.HaloPSA.HaloV3 as Halo
 from modules.miscModules import daysSince, valueExtract, customFieldCheck, userInput
 from modules.msoftModules import winCheck
-from modules.nAbleModules import getN_AbleInfo
+from modules.nAbleModulesv3 import nAble
 from modules.macModules import macCheck
 
-
-version = '0.0.2'
-#
-
+version = "0.0.3"
 #TODO Before making public, status IDs must be switched or it will be useless.
 #TODO Add exception if checks are for EDR
 
@@ -59,9 +57,12 @@ def debugText(string,warnLevel):
 # Halo.invoiceActivator()
 # Create Halo Variables
 hAssets = Halo.assets()
-assetList = hAssets.search()
+assetList = hAssets.search(assettype_id=128)
 hRecurrInv = Halo.recurringInvoices()
 hUsers = Halo.users()
+
+# NAble
+enAble = nAble('uk',key=os.getenv("NABLE_KEY"))
 
 for device in assetList['assets']:
 
@@ -88,7 +89,7 @@ for device in assetList['assets']:
         debugText('Unable to determine last check date, continuing',f'ERROR-{device['id']}')
         pass
     debugText('Getting device details from n-Able',f'INFO-{device['id']}')
-    nAbleDetails = getN_AbleInfo(device['third_party_id'])
+    nAbleDetails = enAble.deviceDetails(deviceid=device['third_party_id'])
     if  nAbleDetails == False: # Skip device if N-Able returns an error
         continue
     debugText('Got details from n-Able',f'INFO-{device['id']}')
@@ -97,9 +98,11 @@ for device in assetList['assets']:
     """ List of Halo custom fields
     156 = HasAV - 1/Yes, 2/No
     160 = hasChecks - 1/Yes, 2/No
+    161 = Do Not Contact 1/True, 2/False
     164 = Bitlocker Identifier - [text]
     165 = Bitlocker Key - [text]
     166 = Has Bitlocker (1/Yes, 2/No)
+    
     """
 
     debugText('Reformatting check data',f'INFO-{device['id']}')
@@ -111,6 +114,7 @@ for device in assetList['assets']:
     bitID = None
     bitKey = None
     encryptionCheck = 2 # 2 = no
+    hasEDR = False
     
     if int(nAbleDetails['checks']['@count']) > 0:
         for check in nAbleDetails['checks']['check']:
@@ -132,10 +136,26 @@ for device in assetList['assets']:
             # Check for EDR since there isnt a "feature" to check for this in the API
             elif check['description'] == 'Integration Check - EDR - Agent Health Status':
                 avCheck = '1'
+                hasEDR = True
                 
     
     # Format output from workstations for Halo
-    activeChecks = '1' if int(nAbleDetails['checks']['@count']) > 0 else '2' # Active checks on device (1 = yes)
+    
+    # Look for active checks on device that are NOT AV related
+    avCheckNames = ['Integration Check - EDR - Agent Health Status','Integration Check - EDR - Threat Status','Script Check - EDR - VSS Status']
+    if hasEDR == True: # There is EDR, see if any checks are not related to EDR.
+        checkCount = int(nAbleDetails['checks']['@count'])
+        for check in nAbleDetails['checks']['check']:
+            if check['description'] in avCheckNames:
+                checkCount -=1
+        activeChecks = '1' if checkCount > 0 else '2'
+            
+        
+    elif int(nAbleDetails['checks']['@count']) > 0: # No AV, but there are active checks
+        activeChecks = '1'
+    else: # No AV, no active checks
+        activeChecks = '2'
+        
 
     # AV Checks (1 = yes)
     optionalList += customFieldCheck(156,avCheck)
@@ -323,6 +343,4 @@ for device in assetList['assets']:
             #input()
     else:
         print('no checks')
-        
-        
         

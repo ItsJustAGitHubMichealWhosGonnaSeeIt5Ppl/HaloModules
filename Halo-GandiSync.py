@@ -34,6 +34,8 @@ for domain in dmeData:
 
 
 
+
+
 today = datetime.now(timezone.utc)
 
 # 2024-10-17T12:00:00.000Z
