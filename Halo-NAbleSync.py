@@ -4,15 +4,19 @@ import json
 import os
 
 # Local modules
-import modules.HaloPSA.HaloV3 as Halo
+from HaloPSA import Assets, RecurringInvoices, Users
 from modules.miscModules import daysSince, valueExtract, customFieldCheck, userInput
 from modules.msoftModules import winCheck
-from modules.nAbleModulesv3 import nAble
+from NAbleAPI import NAble
 from modules.macModules import macCheck
+import os
 
-version = "0.0.3"
+HALO_TENANT = os.getenv('HALO_TENANT')
+HALO_ID = os.getenv('HALO_CLIENT_ID')
+HALO_SECRET = os.getenv('HALO_SECRET')
+
+version = "0.0.4"
 #TODO Before making public, status IDs must be switched or it will be useless.
-#TODO Add exception if checks are for EDR
 
 settings = {
     'osChecking': False, # Enable checking of OS version
@@ -56,18 +60,17 @@ def debugText(string,warnLevel):
 
 # Halo.invoiceActivator()
 # Create Halo Variables
-hAssets = Halo.assets()
+hAssets = Assets(HALO_TENANT,HALO_ID,HALO_SECRET)
 assetList = hAssets.search(assettype_id=128)
-hRecurrInv = Halo.recurringInvoices()
-hUsers = Halo.users()
+hRecurrInv = RecurringInvoices(HALO_TENANT,HALO_ID,HALO_SECRET)
+hUsers = Users(HALO_TENANT,HALO_ID,HALO_SECRET)
 
 # NAble
-enAble = nAble('uk',key=os.getenv("NABLE_KEY"))
+enAble = NAble('uk',key=os.getenv("NABLE_KEY"))
 
 for device in assetList['assets']:
 
     debugText('starting next device',f'INFO-{device['id']}')
-    
     optionalList = [] # Used for all optional checks 
     
     if device['third_party_id'] == 0 or device['assettype_name'] == 'Server': # Skip invalid devices (servers)
@@ -89,8 +92,13 @@ for device in assetList['assets']:
         debugText('Unable to determine last check date, continuing',f'ERROR-{device['id']}')
         pass
     debugText('Getting device details from n-Able',f'INFO-{device['id']}')
-    nAbleDetails = enAble.deviceDetails(deviceid=device['third_party_id'])
+    try:
+        nAbleDetails = enAble.deviceDetails(deviceid=device['third_party_id'],experimentalChecks=True)
+    except ValueError: # Device no longer exists
+        continue # TODO add an actual system here to deal with this. 
+    
     if  nAbleDetails == False: # Skip device if N-Able returns an error
+        print('Error getting NAble details')
         continue
     debugText('Got details from n-Able',f'INFO-{device['id']}')
 
@@ -108,7 +116,7 @@ for device in assetList['assets']:
     debugText('Reformatting check data',f'INFO-{device['id']}')
     
     # Check for bitdefender
-    avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 else '2' 
+    avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 or int(nAbleDetails['edr']) == 1 else '2' 
     
     # Needed for bitlocker check
     bitID = None
@@ -120,7 +128,8 @@ for device in assetList['assets']:
         for check in nAbleDetails['checks']['check']:
             if isinstance(check,str):
                 continue
-            
+            elif check['description'] == 'Script Check - FileVault Status' and check['extra'] =='FileVault is On.': # macOS encryption
+                encryptionCheck = 1
             # Get bitlocker keys from script check
             elif check['description'] == 'Script Check - Enable and Collect Bitlocker Keys' and check['extra'] != None:
                 encryptionCheck = 1
@@ -137,7 +146,13 @@ for device in assetList['assets']:
             elif check['description'] == 'Integration Check - EDR - Agent Health Status':
                 avCheck = '1'
                 hasEDR = True
-                
+
+    if hasEDR and avCheck == '1':
+        pass
+    elif not hasEDR and avCheck == '2': # No EDR
+        pass
+    else:
+        print('EDR DISAGREE!')
     
     # Format output from workstations for Halo
     
@@ -319,13 +334,23 @@ for device in assetList['assets']:
     
         # Attempt to update device if debug mode disabled
     if settings['debugOnly'] == False:
-        debugText(f'{device['id']} updated successfully',f'INFO-{device['id']}')
-        hAssets.update( # Device update payload
-            _dontaddnewfields= True,
-            isassetdetails=True,
-            fields= baseList + optionalList,
-            id=device['id'], # Device ID
-            users= userItem if userItem != None else None)
+        debugText(f'{device['id']} Trying to update',f'INFO-{device['id']}')
+        notSent = 0 # Request has not been sent.
+        while notSent < 10:
+            try:
+                updateAsset = hAssets.update( # Device update payload
+                    _dontaddnewfields= True,
+                    isassetdetails=True,
+                    fields= baseList + optionalList,
+                    id=device['id'], # Device ID
+                    users= userItem if userItem != None else None)
+                debugText(f'{device['id']} Updated successfully',f'INFO-{device['id']}')
+                break
+            
+            except:
+                notSent +=1
+        if notSent == 10:
+            input('Device failed to update, press enter to continue')
     elif settings['debugOnly'] == True:
         debugText('Debug mode enabled, asset not upated',f'INFO-{device['id']}')
 

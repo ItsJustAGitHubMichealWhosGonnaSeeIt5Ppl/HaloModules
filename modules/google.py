@@ -59,11 +59,12 @@ def DriveDataFilter(data,**extra):
         }})
     for event in data.values():
         count = 0
-        for item in event['items']:
-            count +=1
-            if item['actor']['email'] in dictIDs.keys():
-                dictIDs[item['actor']['email']].update({item['events'][0]['name']: True})
-        print(count)
+        if 'items' in event:
+            for item in event['items']:
+                count +=1
+                if item['actor']['email'] in dictIDs.keys():
+                    dictIDs[item['actor']['email']].update({item['events'][0]['name']: True})
+            print(count)
     return dictIDs
 
 

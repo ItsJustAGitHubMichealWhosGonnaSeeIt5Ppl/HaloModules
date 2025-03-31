@@ -57,8 +57,11 @@ def macCheck(osVerRaw,macModel,osSupported=False):
         osVerRaw would look like this: macOS 10.13.6 build 17G14042 
         We only need the numbers, so the rest is discarded. As I'm typing this I'm realising it should be sent as just the number
         """
-        request = requests.get("https://endoflife.date/api/macos/" + str(osVerMain) + ".json") # Free API, not clear how often it updates, so should be taken with a grain of salt.
-        response = json.loads(request.content)
+        try:
+            request = requests.get("https://endoflife.date/api/macos/" + str(osVerMain) + ".json") # Free API, not clear how often it updates, so should be taken with a grain of salt.
+            response = json.loads(request.content)
+        except:
+            return None
 
         eol = response["eol"] if response["eol"] == False else True # Grab EOL tag
 
