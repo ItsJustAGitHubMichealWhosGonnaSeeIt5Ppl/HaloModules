@@ -7,9 +7,13 @@ from HaloPSA import Assets, RecurringInvoices, Users
 from NAbleAPI import NAble
 import logging
 import os
+import re
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(filename='NSightSync.log', level=logging.WARNING)
+logging.basicConfig(filename='NSightSync.log', 
+                    level=logging.WARNING, 
+                    format='%(asctime)s %(levelname)-8s %(message)s', 
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 # HALO
 HALO_TENANT = os.getenv('HALO_TENANT')
@@ -23,7 +27,7 @@ hUsers = Users(HALO_TENANT,HALO_ID,HALO_SECRET)
 # NAble
 enAble = NAble('uk',key=os.getenv("NABLE_KEY"))
 
-version = "0.0.5" 
+version = "0.0.6" 
 #TODO Before making public, status IDs must be switched or it will be useless.
 #TODO set up a no interaction arg so this can be run on a server
 #TODO remove OS checking, put that somewhere else.
@@ -62,6 +66,29 @@ def daysSince(day,value='day'):
     # value can be day or time. Time will return a full datetime string for comparison.
     return (date.today() - timedelta(days=day)) if value.lower() == 'day' else (datetime.now() - timedelta(days=day)) if value.lower() == 'time' else 'invalid request'
 
+def bitlocker_key_extract(check_details:str):
+    """Get Bitlocker keys from check details.  
+    
+    Only works with this check: https://me.n-able.com/s/article/BitLocker-Disk-Encryption-Monitoring-v2-N-central
+
+    Args:
+        check_details (str): Check details string
+
+    Returns:
+        list: List of drive names, keys, and identifiers (each is their own dictionary object)
+    """
+    
+    bitlocker_data = check_details.split("Policy Output Parameters:")[1].splitlines()
+    details = []
+    for line_num, line in enumerate(bitlocker_data):
+        if re.search(r"Encrypted Drive Found - \d - Name:: .:", line):
+            details.append({
+            'name': re.search(r"Encrypted Drive Found - \d - Name:: (.:)", line).group(1),
+            'identifier': re.search(r"Encrypted Drive Found - \d - Identifier: (.*)",bitlocker_data[line_num+2]).group(1).strip("{}"),
+            'key': re.search(r"Encrypted Drive Found - \d - Key:: (.*)",bitlocker_data[line_num+1]).group(1)})
+            
+    return details
+
 # // Code
 # Global Variables used to check how long a device has been online (day only)
 today = date.today()
@@ -76,9 +103,9 @@ for device in assetList['assets']:
     
     if device['third_party_id'] == 0 or device['assettype_name'] == 'Server': # Skip invalid devices (servers)
         if device['assettype_name'] == 'Server':
-            logging.info(f'[{device['id']}] - Server, skipping device')
+            logging.warning(f'[{device['id']}] - Server, skipping device')
         else:
-            logging.info(f'[{device['id']}] - No third party ID, skipping device')
+            logging.warning(f'[{device['id']}] - No third party ID, skipping device')
         continue
 
     # Get additional asset information from Halo
@@ -115,15 +142,16 @@ for device in assetList['assets']:
     164 = Bitlocker Identifier - [text]
     165 = Bitlocker Key - [text]
     166 = Has Bitlocker (1/Yes, 2/No)
+    175 = All Bitlocker Keys [memo]
     
     """
     
     # Check for bitdefender
     avCheck = '1' if int(nAbleDetails['mavbreck']) == 1 or int(nAbleDetails['edr']) == 1 else '2' 
-    
     # Needed for bitlocker check
     bitID = None
     bitKey = None
+    bitlocker_other = ""
     encryptionCheck = 2 # 2 = no
     hasEDR = False
     
@@ -137,14 +165,20 @@ for device in assetList['assets']:
             # Get bitlocker keys from script check
             elif check['description'] == 'Script Check - Enable and Collect Bitlocker Keys' and check['extra'] != None:
                 encryptionCheck = 1
-                extraData = check['extra'].splitlines()
-
-                for dataLine in extraData:
-                    if 'Encrypted Drive Found - 1 - Identifier: ' in dataLine:
-                        bitID = dataLine.split('{')[1].strip('}')
-                    elif 'Encrypted Drive Found - 1 - Key::' in dataLine:
-                        bitKey = dataLine.split('Key:: ')[1]
-                ## extra
+                if check['extra'] == "Script timed out":
+                    logging.warning(f'[{device['id']}] - Bitlocker check is failing!')
+                else:
+                    bitlocker_info = bitlocker_key_extract(check['extra'])
+                    
+                    bitID = bitlocker_info[0]['key']
+                    bitKey = bitlocker_info[0]['identifier']
+                        
+                    bitlocker_other = ""
+                    bitlocker_str = "{drive_letter}\n- Identifier: {identifier}\n- Key: {key}" # Blank string for extra keys
+                    if len(bitlocker_info) > 1: # More than 1 key provided
+                        for info in bitlocker_info[1:]: # Skip first item 
+                            bitlocker_other += bitlocker_str.format(drive_letter=info['name'], identifier=info['identifier'], key=info['key']) +"\n"
+                        
                 
             # Check for EDR since there isnt a "feature" to check for this in the API
             elif check['description'] == 'Integration Check - EDR - Agent Health Status':
@@ -213,7 +247,9 @@ for device in assetList['assets']:
         {"id": "164", # Bitlocker ID
             "value": bitID if bitID != None else None},
         {"id": "165", # Bitlocker Key
-            "value": bitKey if bitID != None else None}
+            "value": bitKey if bitKey != None else None},
+        {"id": "175", # Bitlocker Additional Keys Field
+            "value": bitlocker_other if bitlocker_other != "" else None}
         ]
     
 
